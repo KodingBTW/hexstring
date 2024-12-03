@@ -1,18 +1,39 @@
-import sys
+import re
 
 def readScriptFile(file):
     """
-    Reads a file with a game's text (can be .txt or .bin file).
+    Reads a file with a game's text.
+    Extracts pointer information from the first line and handles multiple breaker lines or just one.
     
     Parameters:
         file (str): The path to the file to read.
     
     Returns:
-        list: A list of strings, each representing a line of text from the file.
+        tuple: Containing:
+            - textData: A list of strings, each representing a line of text from the file.
+            - hexData: A list of important data (pointersStartAddress,pointersEndAddress,PointerTableSize).
+            - dataOut: A string of line breakers.
     """
-    with open(file, "r", encoding='iso-8859-1', errors="replace") as f:
-        textData = [line.rstrip() for line in f.readlines()]
-    return textData
+    hexData = []
+    lineBreakers=''
+    # Open file
+    with open(file, "r", encoding='UTF-8') as f:
+        # Read first line
+        firstLine = f.readline().strip()
+        match = re.match(r";\{([0-9A-Fa-f\-]+)\}-(.*)", firstLine)
+        # Extract addresses inside the braces
+        address = match.group(1)
+        hexData.extend([int(addr, 16) for addr in address.split('-')])
+        # Extract and format breakerLines
+        byte = match.group(2)
+        lineBreakers = ",".join([f"0x{val}" for val in byte.split('-')])
+        
+    # Process text (excluding comments)
+        textData = [
+            line.rstrip() for line in f.readlines()
+            if not (line.startswith(";") or line.startswith("@") or line.startswith("|"))
+        ]
+    return textData, hexData[0], hexData[1], hexData[2], lineBreakers
 
 def readTblFileInverted(tblFile):
     """
@@ -22,75 +43,113 @@ def readTblFileInverted(tblFile):
         tblFile (str): The path to the .tbl file.
     
     Returns:
-        dict: A dictionary where the keys are strings (characters or sequences) and the values are byte values (int).                        
+        dict: A dictionary where the keys are strings (characters or sequences) and the values are byte values (int).
+        int: The length of the longest character sequence in the .tbl file.
     """
     charTable = {}
+    maxSequence = 0
     
-    with open(tblFile, "r", encoding="ISO-8859-1", errors="replace") as f:
+    with open(tblFile, "r", encoding="UTF-8") as f:
         for line in f:
-            if line.startswith("/"):
+            if line.startswith(";") or line.startswith("/"):
                 continue
             if "=" in line:
                 hexValue, chars = line.split("=",1)
+                if "~" in chars:
+                    continue
                 try:
                     hexValue = int(hexValue, 16)
                     chars = chars.rstrip("\n")
-                    charTable[chars] = hexValue 
+                    charTable[chars] = hexValue
+                    maxSequence = max(maxSequence, len(chars))
                 except ValueError:
-                    continue      
-    return charTable
+                    continue
+    return charTable, maxSequence
 
-def encodeText(texts, address, charTable = None):
+def encodeText(textScript, lineBreakers, charTable, longestChar):
     """
-    Encodes the texts into bytes (Support DTE/MTE enconding)
+    Encodes the text into bytes (supports DTE/MTE).
     
     Parameters:
-        texts (list): A list of strings to encode.
-        address (int): The starting offset for the text in the ROM.
-        charTable (dict): A dictionary mapping characters or sequences values to bytes. 
+        textScript (list): List of text strings to encode.
+        charTable (dict): Dictionary that maps character sequences to byte values.
+        longestChar (int): Maximum length of sequences to consider while encoding.
         
     Returns:
         tuple: A tuple containing:
             - bytearray: The encoded text data.
-            - pointets: Pointers list.
+            - pointers: List of pointers (cumulative lengths).
     """
     encodedData = bytearray()
-    totalBytes = 0  
-    pointers = [address]  
+    totalBytes = 0
+    cumulativeLength = [0]
     
-    for line in texts:
-        # If charTable is provided, use it to encode the text (DTE/MTE algorithm).
-        if charTable:
-            i = 0
-            while i < len(line):
-                # Try to match the longest possible sequence from the current position
-                for length in range(min(3, len(line) - i), 0, -1): 
-                    seq = line[i:i+length]  
-                    if seq in charTable:  
-                        encodedData.append(charTable[seq]) 
-                        totalBytes += 1 
-                        i += length  
-                        break
-                else:
-                    # If no sequence matched, encode the single character normally (ASCII)
-                    encodedData.append(ord(line[i]))
-                    totalBytes += 1 
-                    i += 1  
-        else:       
-            # If not tbl provided use ASCII encoding 
-            encodedData.extend(line.encode('iso-8859-1', errors='replace'))
-            
-            # Update the byte counter
-            totalBytes += len(line.encode('iso-8859-1', errors='replace'))
+    # Format to find hexadecimal sequences ~XX~
+    hexCode = r'~([0-9A-Fa-f]{2})~'
 
-        # Add next pointer
-        pointers.append(address + totalBytes)
+    for line in textScript:
+        # Break the line into substrings of normal text and hexadecimal sequences
+        parts = []
+        splitLine = re.split(r'(~[A-Za-z0-9]+~)', line)
+        splitLine = [part for part in splitLine if part]
+        parts.extend(splitLine)
+        # Process each substring
+        processedParts = []
+        for part in parts:
+            # Repeat last pointer function
+            if part.startswith("&"):
+                cumulativeLength.pop()
+                copyLength = totalBytes
+                totalBytes = cumulativeLength[-1]
+                cumulativeLength.append(totalBytes)
+                totalBytes = copyLength
+                continue
+            # If it is a hexadecimal sequence
+            elif re.match(hexCode, part):
+                processedParts.append(bytes([int(part[1:3], 16)])) 
+                totalBytes += 1
+            else:
+                # Encode the sequence using the .tbl table
+                i = 0
+                encodedPart = bytearray()
+                while i < len(part):
+                    # Try to match the longest possible sequence starting from the current position
+                    for length in range(min(longestChar, len(part) - i), 0, -1):
+                        seq = part[i:i+length]
+                        # If the sequence is found in the character table, encode it
+                        if seq in charTable:
+                            encodedPart.append(charTable[seq])
+                            totalBytes += 1
+                            i += length
+                            break
+                    else:
+                         # If no sequence is found, encode the character individually (ASCII)
+                        encodedPart.append(ord(part[i]))
+                        totalBytes += 1
+                        i += 1
+                
+                # Add the encoded part to processed parts
+                processedParts.append(encodedPart)
+
+        # Replace the hexadecimal sequences with their values
+        finalLine = bytearray()
+        for part in processedParts:
+            finalLine.extend(part)
+
+        # Add the processed line to the final result
+        encodedData.extend(finalLine)
         
-    # Remove the innecesary extra pointer
-    pointers.pop()
-    return encodedData, pointers
+        # Mark the end of the line as a pointer (cumulative length)
+        for char in part:
+            if char in lineBreakers:
+                cumulativeLength.append(totalBytes)
 
-def calculatePointers(pointersList, headerSize):
+    # Remove the unnecessary pointer at the end
+    cumulativeLength.pop()
+    
+    return encodedData, cumulativeLength
+
+def calculatePointer2Bytes(listCumulativeLength, firstPointer, headerSize):
     """
     Calculates and returns the pointer data after adjusting each pointer with the header size
     and encoding them in little-endian format.
@@ -102,17 +161,125 @@ def calculatePointers(pointersList, headerSize):
     Returns:
         bytearray: The encoded pointer data in little-endian format.
     """
+    # Add first pointer for each cumulative lenth generating pointer exact size.
+    pointersList = [ptr + firstPointer for ptr in listCumulativeLength]
+
+    # Subtract the header size from each pointer in the list
+    pointersList = [ptr - headerSize for ptr in pointersList]
+    
+    # Convert the list of pointers to bytearray (Little-endian encoding)
+    pointersData = bytearray()
+    for ptr in pointersList:
+        pointersData.append(ptr & 0xFF)                 # Least significant byte
+        pointersData.append((ptr >> 8) & 0xFF)          # Most significant byte
+    return pointersData
+
+def calculatePointer2BytesBigEndian(listCumulativeLength, firstPointer, headerSize):
+    """
+    Calculates and returns the pointer data after adjusting each pointer with the header size
+    and encoding them in big-endian format.
+
+    Parameters:
+        pointersList (list): A list of pointers to adjust and encode.
+        headerSize (int): The header size to subtract from each pointer.
+
+    Returns:
+        bytearray: The encoded pointer data in big-endian format.
+    """
+    # Add first pointer for each cumulative lenth generating pointer exact size.
+    pointersList = [ptr + firstPointer for ptr in listCumulativeLength]
+
+    # Subtract the header size from each pointer in the list
+    pointersList = [ptr - headerSize for ptr in pointersList]
+    
+    # Convert the list of pointers to bytearray (Big-endian encoding)
+    pointersData = bytearray()
+    for ptr in pointersList:
+        pointersData.append((ptr >> 8) & 0xFF)      # Most significant byte
+        pointersData.append(ptr & 0xFF)             # Least significant byte
+    return pointersData
+
+def calculatePointer2BytesSeparated(listCumulativeLength, firstPointer, headerSize):
+    """
+    Calculates and returns the pointer data after adjusting each pointer with the header size
+    and encoding them separate bytes (lsb first, msb later) in little-endian format.
+
+    Parameters:
+        listCumulativeLength (list): A list of cumulative pointer lengths to adjust.
+        firstPointer (int): The first pointer to add to each cumulative length.
+        headerSize (int): The header size to subtract from each pointer.
+        
+    Returns:
+        bytearray: The encoded pointer data in little-endian format.
+    """
+    # Add first pointer for each cumulative lenth generating pointer exact size.
+    pointersList = [ptr + firstPointer for ptr in listCumulativeLength]
+
     # Subtract the header size from each pointer in the list
     pointersList = [ptr - headerSize for ptr in pointersList]
 
-    # Reverse bytes (Little-endian encoding)
-    pointersList = [((ptr >> 8) & 0xFF) | ((ptr & 0xFF) << 8) for ptr in pointersList]  
+    # Generate the separated bytes in little-endian order (LSB first, MSB second)
+    separatedBytes = [
+        (ptr & 0xFF) for ptr in pointersList
+    ] + [
+        ((ptr >> 8) & 0xFF) for ptr in pointersList 
+    ]
+    return bytearray(separatedBytes)
 
-    # Convert the list of pointers to bytearray
+def calculatePointer3Bytes(listCumulativeLength, firstPointer, headerSize=None):
+    """
+    Calculates and returns the pointer data after adjusting each pointer with the header size
+    and encoding 2 last bytes in little-endian format.
+
+    Parameters:
+        pointersList (list): A list of pointers to adjust and encode.
+        headerSize (int): The header size to subtract from each pointer.
+
+    Returns:
+        bytearray: The encoded pointer data in big-endian format.
+    """
+    # Add first pointer for each cumulative lenth generating pointer exact size.
+    pointersList = [ptr + firstPointer for ptr in listCumulativeLength]
+
+    # Process each pointer
     pointersData = bytearray()
     for ptr in pointersList:
-        pointersData.append((ptr >> 8) & 0xFF)  # Most significant byte
-        pointersData.append(ptr & 0xFF)         # Least significant byte
+        bank = (ptr >> 16) & 0xFF
+        last2Bytes = ptr & 0xFFFF
+        invert = ((last2Bytes  >> 8) & 0xFF) | ((last2Bytes & 0xFF) << 8)
+        # Append the bank byte and the two bytes little-endian
+        pointersData.append(bank)
+        pointersData.append((invert >> 8) & 0xFF)     # Least significant byte
+        pointersData.append(invert & 0xFF)            # Most significan byte
+
+    return pointersData
+    
+def calculatePointer4Bytes(listCumulativeLength, firstPointer, headerSize=None):
+    """
+    Calculates and returns the pointer data after adjusting each pointer with the header size
+    and encoding them in big-endian format.
+
+    Parameters:
+        pointersList (list): A list of pointers to adjust and encode.
+        headerSize (int): The header size to subtract from each pointer.
+
+    Returns:
+        bytearray: The encoded pointer data in big-endian format.
+    """
+    # Add first pointer for each cumulative lenth generating pointer exact size.
+    pointersList = [ptr + firstPointer for ptr in listCumulativeLength]
+
+    # Format
+    for ptr in pointersList:
+        ptr = ptr & 0xFFFFFFFF
+    
+    # Convert the list of pointers to bytearray (Big-endian encoding)
+    pointersData = bytearray()
+    for ptr in pointersList:
+        pointersData.append((ptr >> 24) & 0xFF)     # Most significant byte
+        pointersData.append((ptr >> 16) & 0xFF)     # Second byte
+        pointersData.append((ptr >> 8) & 0xFF)      # Thirth byte
+        pointersData.append(ptr & 0xFF)             # Least significant byte
     return pointersData
 
 def writeROM(romFile, startOffset, data):
