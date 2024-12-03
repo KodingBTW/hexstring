@@ -1,5 +1,5 @@
 # HexString
-HexString is a text dumper that creates a binary file which you can edit with your favorite text editor. It also allows automatic pointer calculation, making it much easier and faster to translate a ROM. It supports compression via DTE/MTE.
+HexString is a text dumper that creates a binary file which you can edit with your favorite text editor. It also allows automatic pointer calculation, making it much easier and faster to translate a ROM. It supports compression different pointers lenght and formats, also support compression via DTE/MTE.
 
 ## Requirements
 To compile you can use pyinstaller library. 
@@ -25,13 +25,21 @@ HexString [-d | -e] inFileName outFileName
 Description:
 
 ```
-HexString -d <romFile> <PointersStartAddress> <PointerTableSize> <HeaderSize> <LineBreaker> <outFile> [tblFile] - Decode text from ROM file.
+HexString -d <pointersFormat> <romFile> <PointersStartAddress> <PointerTableSize> <HeaderSize> <LineBreaker> <outFile> [tblFile] - Decode text from ROM file.
 
-HexString -e <TextFile> <TextStartAddress> <TextSize> <PointersStartAddress> <HeaderSize> <romFile> [tblFile] - Encode text to ROM file.
+HexString -e <pointersFormat> <TextFile> <TextStartAddress> <TextSize> <PointersStartAddress> <HeaderSize> <romFile> [tblFile] - Encode text to ROM file.
 
 -h - Display help
 
 -v - Output version information
+```
+List of pointer format supported:
+```
+-2b  --2 bytes little endian
+-2bb --2 bytes big endian
+-2bs --2 bytes splitted (lsb-msb)
+-3b  --3 bytes (gba format)
+-4b  --4 bytes (mega drive - big endian)
 ```
 The program doesn't handle many exceptions, so try to provide the correct information to avoid issues. For more information, read the attached readme.txt.
 
