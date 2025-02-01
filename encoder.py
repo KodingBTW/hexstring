@@ -30,7 +30,7 @@ def readScriptFile(file):
         
     # Process text (excluding comments)
         textData = [
-            line.rstrip() for line in f.readlines()
+            line.rstrip('\n') for line in f.readlines()
             if not (line.startswith(";") or line.startswith("@") or line.startswith("|"))
         ]
     return textData, hexData[0], hexData[1], hexData[2], lineBreakers
@@ -282,7 +282,7 @@ def calculatePointer4Bytes(listCumulativeLength, firstPointer, headerSize=None):
         pointersData.append(ptr & 0xFF)             # Least significant byte
     return pointersData
 
-def writeROM(romFile, startOffset, data):
+def writePointers(romFile, startOffset, data):
     """
     Writes data to the ROM at the specified offset.
     
@@ -294,3 +294,28 @@ def writeROM(romFile, startOffset, data):
     with open(romFile, "r+b") as f: 
         f.seek(startOffset)
         f.write(data)
+        
+def writeText(romFile, startOffset, maxSize, data):
+    """
+    Writes data to the ROM at the specified offset.
+    
+    Parameters:
+        romFile (str): The path to the ROM file.
+        startOffset (int): The offset in the ROM file where data should be written.
+        data (bytes or bytearray): The data to write to the ROM.
+    """
+    # Check that the size of the data does not exceed the maximum allowed
+    if len(data) > int(maxSize):
+        excess = len(data) - int(maxSize)
+        return False
+    
+    # Check free space
+    freeSpace = int(maxSize) - len(data)
+
+    # Fill free space
+    filledData = data + b'\xFF' * freeSpace
+        
+    with open(romFile, "r+b") as f: 
+        f.seek(startOffset)
+        f.write(filledData)
+        return True

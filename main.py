@@ -1,6 +1,6 @@
 ## HexString
 ## Source code by koda
-## release 03/12/2024 --version 1.1
+## release 03/01/2025 --version 1.2 (no space)
 
 import sys
 import os
@@ -51,7 +51,7 @@ def main():
         except ValueError:
             print("Error: Incorrect hex value.")
             sys.exit(1)
-        lineBreaker = sys.argv[7]                                   # Line breaker input (comma-separated)
+        lineBreaker = sys.argv[7]                                   # Line breaker input
         outFile = sys.argv[8]                                       # Output file for the extracted text
         tblFile = sys.argv[9]                                       # Tbl file argument
 
@@ -64,7 +64,7 @@ def main():
 
         # Parse line breakers.
         try:
-            parseLineBreakers = de.parseLineBreakers(lineBreaker)
+            parseLineBreakers, isOffset = de.parseLineBreakers(lineBreaker)
         except ValueError:
             print("Error: Incorrect hex value.")
             sys.exit(1)
@@ -86,7 +86,10 @@ def main():
             
         # Extract the texts
         try:
-            texts, totalBytesRead, linesLenght = de.extractTexts(romData, lineStartAddress, parseLineBreakers, charTable)
+            if not isOffset:
+                texts, totalBytesRead, linesLenght = de.extractTexts(romData, lineStartAddress, parseLineBreakers, charTable)
+            else:
+                texts, totalBytesRead, linesLenght = de.extractTextsNoLineBreakers(romData, lineStartAddress, parseLineBreakers, charTable)
         except IndexError:
             print(f"Error: Start address is bigger than the ROM size.")
             sys.exit(1)
@@ -166,33 +169,29 @@ def main():
         
         # Format pointers
         encodedPointers = pointersFormat(pointersList, textStartAddress, headerSize)
-
-        # Check that the size of the data does not exceed the maximum allowed
-        if len(encodedText) > int(textSize):
-            excess = len(encodedText) - int(textSize)
-            sys.stdout.write("Error: The number of bytes read exceeds the maximum block limit.\n")
-            sys.stdout.write(f"Remove {excess} bytes from {scriptFile} file.\n") 
-            sys.exit(1)
-
-        # Check free bytes
-        freeBytes = int(textSize) - len(encodedText)
-            
+        
         # Write the text to the ROM
         try:
-            en.writeROM(romFile, textStartAddress, encodedText)
+            if en.writeText(romFile, textStartAddress, textSize, encodedText):
+                # Write the pointers to the ROM
+                en.writePointers(romFile, pointersStartAddress, encodedPointers)
+                freeSpace = int(textSize) - len(encodedText)
+                print(f"Text written at offset {hex(textStartAddress)}.")
+                print(f"Pointers table written at offset {hex(pointersStartAddress)} with {len(pointersList)} pointers.")
+                print(f"Free space: {freeSpace} bytes.")
+                print(f"Data written to {romFile}")
+                print("Encoding complete.\n")
+                sys.exit(1)
+
+            else:
+                excess = len(encodedText) - int(textSize)
+                sys.stdout.write("Error: The number of bytes read exceeds the maximum block limit.\n")
+                sys.stdout.write(f"Remove {excess} bytes from {scriptFile} file.\n") 
+                sys.exit(1)
+                
         except FileNotFoundError:
             print(f"Error: File {romFile} not found in directory.")
             sys.exit(1)
-            
-        # Write the pointers to the ROM
-        en.writeROM(romFile, pointersStartAddress, encodedPointers)
-
-        print(f"Text written at offset {hex(textStartAddress)}.")
-        print(f"Pointers table written at offset {hex(pointersStartAddress)} with {len(pointersList)} pointers.")
-        print(f"Free space: {freeBytes} bytes.")
-        print(f"Data written to {romFile}")
-        print("Encoding complete.\n")
-        sys.exit(1)
 
     elif sys.argv[1] == '-h':
         print("\nUsage: HexString [-d|e] [input_file output_file]")
@@ -209,14 +208,11 @@ def main():
         sys.exit(1)
         
     elif sys.argv[1] == '-v':
-        sys.stdout.write("\nHexSring created by koda, version 1.1.0")
+        sys.stdout.write("\nHexSring created by koda, version 1.2")
         sys.exit(1)
 
     else:
-        sys.stdout.write("Usage: -d <pointersFormat> <romFile> <PointersStartAddress> <PointerTableSize> <HeaderSize> <LineBreaker> <outFile> <tblFile>\n")
-        sys.stdout.write("       -e <pointersFormat> <TextFile> <TextStartAddress> <TextSize> <PointersStartAddress> <HeaderSize> <romFile> <tblFile>\n")
-        sys.stdout.write("       -h show help.\n")
-        sys.stdout.write("       -v show version.\n")
+        showHelp()
         sys.exit(1)
 
 if __name__ == '__main__':

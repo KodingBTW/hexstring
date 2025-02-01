@@ -153,12 +153,10 @@ def processPointers4Bytes(data, header):
         # Read four bytes as a quartet
         quartet = data[i:i + 4]
         
-        # Get last two byte of the quartet
-        get2Bytes = quartet[2:]
-        
         # Convert the final triplet to an integer
-        value = int.from_bytes(get2Bytes, byteorder='big') + header
+        value = int.from_bytes(quartet, byteorder='big') + header
         result.append(value)
+
     return result
 
 def extractTexts(romData, addressesList, lineBreakers, charTable):
@@ -187,13 +185,14 @@ def extractTexts(romData, addressesList, lineBreakers, charTable):
     # Loop over each starting address in the list
     for addr in addressesList:
         text = bytearray()
+        decodedValidCharacter = False
         
         while True:
             byte = romData[addr]  
             bytesLineCounter += 1
 
             # If the byte is a line-breaker, stop extracting
-            if byte in lineBreakers:
+            if byte in lineBreakers and decodedValidCharacter:
                 breakerByte = byte
                 break
 
@@ -203,10 +202,12 @@ def extractTexts(romData, addressesList, lineBreakers, charTable):
                 # If single character
                 if len(char) == 1:
                     text.append(ord(char))
+                    decodedValidCharacter = True
                 # If multiple characters (DTE/MTE)
                 else:  
                     for c in char:
                         text.append(ord(c))
+                    decodedValidCharacter = True
             # If byte is not in charTable, print in format ~hex~
             else:
                 hexValue = format(byte, '02X')
@@ -243,6 +244,76 @@ def extractTexts(romData, addressesList, lineBreakers, charTable):
 
     return texts, totalBytesRead, linesLength
 
+def extractTextsNoLineBreakers(romData, addressesList, endOffset, charTable):
+    """
+    Extracts texts from the ROM data at specified addresses based on the lengths in linesLength.
+    
+    Parameters:
+        romData (bytes): The complete ROM data.
+        addressesList (list): A list of addresses to read the texts from.
+        endOffset (set): The final offset after the last address.
+        charTable (dict): A dictionary mapping byte values to characters or sequences.
+    
+    Returns:
+        tuple: Containing:
+            - texts (list): Extracted script text.
+            - totalBytesRead (int): Total text block size.
+            - linesLength (list): Length of each line in bytes.
+    """
+    texts = []  
+    linesLength = []
+    total = 0
+
+    # Add final offset to the addressesList
+    addressesList.append(int(endOffset.pop()))
+
+    # Calculate lines lenght of each segment is the difference between consecutive addresses
+    for i in range(len(addressesList) - 1):
+        length = int(addressesList[i + 1]) - int(addressesList[i])
+        linesLength.append(length)
+
+    # Loop over each starting address in the list and use linesLength for determining byte ranges
+    for i in range(len(addressesList) - 1):
+        startAddr = addressesList[i]
+        length = linesLength[i]  # Get the length for this segment
+        endAddr = startAddr + length
+        
+        text = bytearray()
+        decodedValidCharacter = False
+        
+        # Read bytes from the starting address to the end address (using the specified length)
+        for addr in range(startAddr, endAddr):
+            byte = romData[addr]
+
+            # Map the byte using charTable to get the character
+            char = charTable.get(byte, None)  
+            if char:
+                # If single character
+                if len(char) == 1:
+                    text.append(ord(char))
+                    decodedValidCharacter = True
+                # If multiple characters (DTE/MTE)
+                else:  
+                    for c in char:
+                        text.append(ord(c))
+                    decodedValidCharacter = True
+            # If byte is not in charTable, print in format ~hex~
+            else:
+                hexValue = format(byte, '02X')
+                text.extend(f"~{hexValue}~".encode('UTF-8'))
+        
+        # Convert byte array to string
+        decodedText = text.decode('iso-8859-1', errors='replace')
+
+        # Append the decoded text to the list
+        texts.append(decodedText)
+        total += length
+
+    # Calculate total bytes read (this will be the sum of all lengths in linesLength)
+    totalBytesRead = total
+
+    return texts, totalBytesRead, linesLength
+
 def parseLineBreakers(string):
     """
     Parse a string of comma-separated hexadecimal values into a set of integers.
@@ -257,8 +328,11 @@ def parseLineBreakers(string):
     for byte in string.split(','):
         byte = byte.strip() 
         lineBreakers.add(int(byte, 16))
+
+    # If the lineBreaker are the final text offset
+    is_offset = any(value > 255 for value in lineBreakers)
         
-    return lineBreakers
+    return lineBreakers, is_offset
 
 def formatHexString(hexString):
     """
