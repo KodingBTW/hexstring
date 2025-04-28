@@ -11,9 +11,11 @@ pip install pyinstaller
 ```
 git clone https://github.com/KodingBTW/hexstring
 
-cd hexstring
+pip install -r requirements.txt
 
-pyinstaller --onefile -c --icon=icon.ico main.py --name HexString
+cd src
+
+build.bat
 ```
 ## Usage
 
