@@ -1,5 +1,5 @@
 # HexString
-HexString is a text dumper that creates a binary file which you can edit with your favorite text editor. It also allows automatic pointer calculation, making it much easier and faster to translate a ROM. It supports compression different pointers lenght and formats, also support compression via DTE/MTE.
+HexString is a text dumper that lets you extract text from a ROM using a simple and friendly user interface, which you can then edit with your favorite text editor. It also allows for automatic pointer computation, making translation to ROM faster and easier. It supports compression of pointers of different lengths and formats, as well as compression using DTE/MTE.
 
 ## Requirements
 To compile you can use pyinstaller library. 
@@ -25,7 +25,7 @@ build.bat
 To export script:
 1. Open ROM file and tbl file
 2. Select pointers format (lenght and endiannes)
-3. Fill all space in "Set Offsets"
+3. Fill all spaces in "Set Offsets"
 4. Press "Extract script and save", a window'll appear,
 select output file and save
 5. Edit the file with you favorite text editor, I 
@@ -33,11 +33,14 @@ recomment use  Notepad++, always use UTF-8
 
 To insert Script:
 1. Import Script in Select Files
-2. Refill all onformation or use open config in file
+2. Refill all spaces or use open config in file
 tab
 3. Press insert Script to ROM
 
+More information in README.txt
+
 ## Console 
+HexString allows the use of console commands for script creation using the included "console.exe"
 ```
 console.exe [extract | insert] inFileName outFileName
 ```
@@ -66,8 +69,8 @@ List of pointer format supported:
 		4b		4 bytes little endian
 		4bb		4 bytes big endian
 ```
-Watch cli_commands.txt for detailed commands.
-Command lines don't handle to much exception, try to avoid using correct commands.
+See cli_commands.txt for detailed commands.
+Note: Command lines don't handle to much exception, try to avoid using correct commands.
 
 ## Frecuency Answer Questions
 
