@@ -11,6 +11,8 @@ pip install pyinstaller
 ```
 git clone https://github.com/KodingBTW/hexstring
 
+cd hexstring
+
 pip install -r requirements.txt
 
 cd src
