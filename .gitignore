@@ -1,6 +1,5 @@
 /_pycache_
 /dist
-/build/HexString
 *.tbl
 *.bin
 *.exe

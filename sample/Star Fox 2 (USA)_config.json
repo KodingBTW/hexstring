@@ -1,0 +1,20 @@
+{
+    "rom_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Star Fox 2 (USA).sfc",
+    "tbl_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Star Fox 2 (USA).tbl",
+    "pointer_size": "2 bytes",
+    "endianess": 0,
+    "pointers_start_offset": "2EB3",
+    "pointers_end_offset": "3062",
+    "pointers_base": "-8000",
+    "text_start_offset": "1168",
+    "text_end_offset": "2EB2",
+    "end_line": "00",
+    "fill_free_space_byte": "FF",
+    "no_use_comments_lines": false,
+    "use_custom_brackets": false,
+    "brackets": 0,
+    "fill_free_space": false,
+    "use_split_pointers": false,
+    "ignore_end_line": true,
+    "not_use_end_line": false
+}
