@@ -19,9 +19,25 @@ cd src
 
 build.bat
 ```
-## Usage
+## Interface
+![image](https://github.com/user-attachments/assets/5733b562-6103-4d32-8df7-a58b505d75aa)
 
-Synopsis:
+To export script:
+1.- Open ROM file and tbl file
+2.- Select pointers format (lenght and endiannes)
+3.- Fill all space in "Set Offsets"
+4.- Press "Extract script and save", a window'll appear,
+select output file and save
+5.- Edit the file with you favorite text editor, I 
+recomment use  Notepad++, always use UTF-8
+
+To insert Script:
+1.- Import Script in Select Files
+2.- Refill all onformation or use open config in file
+tab
+3.- Press insert Script to ROM
+
+## Console 
 ```
 HexString [-d | -e] inFileName outFileName
 ```
@@ -29,9 +45,13 @@ HexString [-d | -e] inFileName outFileName
 Description:
 
 ```
-HexString -d <pointersFormat> <romFile> <PointersStartAddress> <PointerTableSize> <HeaderSize> <LineBreaker> <outFile> [tblFile] - Decode text from ROM file.
+For extraction:
 
-HexString -e <pointersFormat> <TextFile> <TextStartAddress> <TextSize> <PointersStartAddress> <HeaderSize> <romFile> [tblFile] - Encode text to ROM file.
+console.exe extract --rom <romFile> --p <pointersFormat> --pointers-offset <pointersStartOffset> --pointers-size <tablePointersSize> --base <base> --end-line <end_lines> --out <outFile> --tbl <tblFile> [Advanced Options]
+
+For insert:
+
+console.exe insert --file <inputFile> --p <pointersFormat> --text-offset <textStartOffset> --text-size <textSize> --pointers-offset <pointersStartOffset> --base <base> --rom <romName> --tbl <tblFile> [Advanced Options]
 
 -h - Display help
 
@@ -39,14 +59,15 @@ HexString -e <pointersFormat> <TextFile> <TextStartAddress> <TextSize> <Pointers
 ```
 List of pointer format supported:
 ```
--2b  --2 bytes little endian
--2bb --2 bytes big endian
--2bs --2 bytes splitted (lsb-msb)
--3b  --3 bytes (gba format)
--4b  --4 bytes (mega drive - big endian)
+		2b 		2 bytes little endian
+		2bb 	2 bytes big endian
+		3b		3 bytes little endian
+		3bb		3 bytes big endian
+		4b		4 bytes little endian
+		4bb		4 bytes big endian
 ```
-The program doesn't handle many exceptions, so try to provide the correct information to avoid issues. For more information, read the attached readme.txt.
-
+Watch cli_commands.txt for detailed commands.
+Command lines don't handle to much exception, try to avoid using correct commands.
 ## Frecuency Answer Questions
 
 ### 1.- Can I use this tool in my personal project?
