@@ -2,10 +2,10 @@
 
 Nombre:			HexString
 Autor:			koda
-Latest Version:  	1.1.0
+Latest Version:  	1.3.0
 URL:			https://traduccioneskoda.blogspot.com/
 				https://github.com/KodingBTW/hexstring
-Last Update:	03/12/2024
+Last Update:	28/04/2024
 
 ------------------------------------------------------
 1 - WHAT'S THIS?
@@ -21,6 +21,50 @@ focus on translating.
 ------------------------------------------------------
 2 - WHAT'S NEW
 ------------------------------------------------------
+V1.3.0
+- Graphical interface added
+
+- Maintained legacy CLI (Watch cli_commands.txt)
+
+- Tons of new options added
+
+- Support 2 bytes, 3 bytes and 4 bytes pointers for
+little and big endian.
+
+- Now you can save and load .json configs
+
+- You can select whether you want comments on lines.
+
+- Added the use of custom brackets for raw hexadecimals.
+
+- Option to fill the free space with a specific byte.
+- Support for split pointers (LSB/MSB).
+
+- Smart function that allows you to ignore any control
+code at the beginning of a line that is equal to the
+end-of-line code.
+
+- Function that ignores the use of an end-of-line code
+to count pointers. (It will split based on the length of
+the pointer; to insert each line in the file, it will be
+a pointer.)
+
+- Added About tab
+
+- Added Reset fields tab
+
+- Optimized code
+
+V1.2
+- Now empty line before linebreaker are corrected
+readed.
+
+- You can replace linbreaker for text end offset
+and the program will split text with the pointer
+table.
+
+- 4 bytes pointer are correctly interpreted.
+
 V1.1.0
 
 Bugs Fixed:
@@ -80,102 +124,72 @@ V1.0.0
 ------------------------------------------------------
 3 - HOW TO USE IT?
 ------------------------------------------------------
+This program requires a certain level of romhacking 
+skill.
 
-To decode:
+Requeriments:
+- Know how to create a thingy .tbl table
+- Know how indentify pointers format
+- Know how to find pointers
+- Know how to edit sources and fonts
+- Edition with some text editor (ex: Notepad++)
+- A basic sense how a rom work.
 
-Use the Windows console and type -d, then fill in the 
-arguments:
+To export script:
 
-- pointersFormat:
+1.- Open ROM file and tbl file
 
-	-2b   --2bytes "little endian"
-	-2bb  --2bytes "big endian"
-	-2bs  --2bytes "splitted lsb-msb"
-	-3b   --3bytes "(bank/2bytespointer) gba format"
-	-4b   --4bytes "Mega drive games little endian"
+2.- Select pointers format (lenght and endiannes)
 
-- romFile: ROM file name.
+3.- Fill all space in "Set Offsets"
 
-- pointersStartAddress: Address where the pointer table 
-begins.
+*Pointers Base: Distance beetween text offset and 
+the pointer (inverted if pointers are in little endian)
 
-- pointerTableSize: Size of the pointers, in hexadecimal.
-
-- headerSize: The size of the header 
-
-Formula: Text Address for the pointer - pointer inverted
-(little endian case)
+Ecuation
+(Text Address for the pointer - pointer inverted)
 
 Example: for Goof Troop (U).snes
 
-The pointer format are 2bytes little endian, so the
-pointer is "81 E8", the text address is "0x05E881", so
-if you use the formula: 5E881 - E881 = 0x50000
+ROMK Pointer format are 2 bytes little endian, so the
+pointer is "81 E8", so you invert to $E881, 
+the text address is "$05E881", so if you use the 
+ecuation: $5E881 - $E881 = $50000
 
-- lineBreaker: Code used in the ROM to break the text 
-strings, e.g., 0x00 or 0xFF. (If there is more than 
-one, separate with commas).
-- outFile: Output file, it can be a .bin or .txt file.
+*End Line: Code used to split lines by pointers. 
+It is possible to use multiple lines separated by ",". 
+If it is not clear, I recommend using the advanced option 
+"not use end lines"
 
-- tblFile: (optional) If provided, it decodes using a 
-.tbl file; otherwise, it uses ASCII.
-Para codificar:
+4.- Press "Extract script and save", a window'll appear,
+select output file and save
 
-Then edit the output file with your favorite text editor
-(I recommend Notepad++).
+5.- Edit the file with you favorite text editor, I 
+recomment use  Notepad++, always use UTF-8
 
+NOTE: save config for easily insertion if you wanna
+translate in multiple sesions.
 
-To encode:
+To insert Script:
 
-Use the Windows console and type -e, then fill in the 
-arguments:
+1.- Import Script in Select Files
 
-- pointersFormat:
+2.- Refill all onformation or use open config in file
+tab
 
-	-2b   --2bytes "little endian"
-	-2bb  --2bytes "big endian"
-	-2bs  --2bytes "splitted lsb-msb"
-	-3b   --3bytes "(bank/2bytespointer) gba format"
-	-4b   --4bytes "Mega drive games little endian"
+3.- Press insert Script to ROM
 
-- textFile: File with the text.
-
-- textStartAddress: Address where the text block begins.
-
-- textSize: Size of the text block, in hexadecimal.
-
-- pointersStartAddress: Address where the pointer table 
-begins.
-
-- headerSize: The same decoder formula.
-
-- romFile: ROM file name.
-
-- tblFile: (optional) If provided, it decodes using a .tbl
-file; otherwise, it uses ASCII.
-
-Tips:
-
--To avoid typing the arguments repeatedly, I recommend 
-creating a .bat file for quicker operation.
-
--Before you begin, it's recommended to make a copy of the
- ROM and back up any progress you have.
- 
--Before starting to translate, once the text has been 
-extracted, reinsert it again. This will help you know 
-if you are giving the right arguments. You can also use 
-a hexagecimal comparator and compare it with a made copy.
-
-- If when inserting the text you enter it is greater 
-than the block. You have three options, reduce the text, 
-find an empty space, or expand the rom.
 
 ------------------------------------------------------
-4 - TO DO:
+4 - CLI (LEGACY)
 ------------------------------------------------------
 
-- Possibly add new algorithms for new pointer formats.
+Use console.exe for cli commands if you dont want use
+interface. Check cli_commands.txt for all commands
 
-- A graphical interface—unlikely, as it requires a 
-lot of work, which I don't have time for right now.
+
+------------------------------------------------------
+5 - TO DO:
+------------------------------------------------------
+
+- Possibly add new algorithms for compressed text
