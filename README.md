@@ -23,23 +23,23 @@ build.bat
 ![image](https://github.com/user-attachments/assets/5733b562-6103-4d32-8df7-a58b505d75aa)
 
 To export script:
-1.- Open ROM file and tbl file
-2.- Select pointers format (lenght and endiannes)
-3.- Fill all space in "Set Offsets"
-4.- Press "Extract script and save", a window'll appear,
+1. Open ROM file and tbl file
+2. Select pointers format (lenght and endiannes)
+3. Fill all space in "Set Offsets"
+4. Press "Extract script and save", a window'll appear,
 select output file and save
-5.- Edit the file with you favorite text editor, I 
+5. Edit the file with you favorite text editor, I 
 recomment use  Notepad++, always use UTF-8
 
 To insert Script:
-1.- Import Script in Select Files
-2.- Refill all onformation or use open config in file
+1. Import Script in Select Files
+2. Refill all onformation or use open config in file
 tab
-3.- Press insert Script to ROM
+3. Press insert Script to ROM
 
 ## Console 
 ```
-HexString [-d | -e] inFileName outFileName
+console.exe [extract | insert] inFileName outFileName
 ```
 
 Description:
@@ -60,7 +60,7 @@ console.exe insert --file <inputFile> --p <pointersFormat> --text-offset <textSt
 List of pointer format supported:
 ```
 		2b 		2 bytes little endian
-		2bb 	2 bytes big endian
+		2bb 		2 bytes big endian
 		3b		3 bytes little endian
 		3bb		3 bytes big endian
 		4b		4 bytes little endian
@@ -68,6 +68,7 @@ List of pointer format supported:
 ```
 Watch cli_commands.txt for detailed commands.
 Command lines don't handle to much exception, try to avoid using correct commands.
+
 ## Frecuency Answer Questions
 
 ### 1.- Can I use this tool in my personal project?
@@ -80,4 +81,4 @@ Yes, but give me some time. In fact, you can make a pull request if you manage t
 
 ### 3.- Could you add new functionalities? I need it to work in this specific way.
 
-Absolutely not, I don't plan on doing much more than what's already included. If you need something specific, you'll have to do it on your own. Feel free to work with my code however you like, as long as you mention me, it's no problem.
+Absolutely not. If you need something specific, you'll have to do it on your own. Feel free to work with my code however you like, as long as you mention me, it's no problem.
