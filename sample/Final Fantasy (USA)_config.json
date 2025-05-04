@@ -1,0 +1,21 @@
+{
+    "rom_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Final Fantasy (USA).nes",
+    "tbl_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Final Fantasy (USA).tbl",
+    "script_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Final Fantasy (USA)_script.bin",
+    "pointer_size": "2 bytes",
+    "endianess": 0,
+    "pointers_start_offset": "28010",
+    "pointers_end_offset": "2820F",
+    "pointers_base": "20010",
+    "text_start_offset": "28210",
+    "text_end_offset": "2B495",
+    "end_line": "00",
+    "fill_free_space_byte": "00",
+    "no_use_comments_lines": false,
+    "use_custom_brackets": false,
+    "brackets": 0,
+    "fill_free_space": true,
+    "use_split_pointers": false,
+    "ignore_end_line": false,
+    "not_use_end_line": false
+}
