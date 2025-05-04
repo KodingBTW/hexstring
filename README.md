@@ -26,7 +26,7 @@ To export script:
 1. Open ROM file and tbl file
 2. Select pointers format (lenght and endiannes)
 3. Fill all spaces in "Set Offsets"
-4. Press "Extract script and save", a window'll appear,
+4. Press "Extract script and save", a window will appear,
 select output file and save
 5. Edit the file with you favorite text editor, I 
 recomment use  Notepad++, always use UTF-8
