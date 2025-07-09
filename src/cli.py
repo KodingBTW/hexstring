@@ -219,22 +219,22 @@ class CLI:
         else:
             original_pointers_start_offset = self.args.pointers_offset
             if self.args.p == '2b':
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_2_bytes(cumulative_lengths, original_text_start_offset, base, 0)
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_2_bytes(cumulative_lengths, original_text_start_offset, False, base, 0)
                 pointers_length = 2
             elif self.args.p == '2bb':
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_2_bytes(cumulative_lengths, original_text_start_offset, base, 1)
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_2_bytes(cumulative_lengths, original_text_start_offset, False, base, 1)
                 pointers_length = 2
             elif self.args.p == '3b':
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_3_bytes(cumulative_lengths, original_text_start_offset, base, 0)
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_3_bytes(cumulative_lengths, original_text_start_offset, False, base, 0)
                 pointers_length = 3
             elif self.args.p == '3bb':
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_3_bytes(cumulative_lengths, original_text_start_offset, base, 1)
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_3_bytes(cumulative_lengths, original_text_start_offset, False, base, 1)
                 pointers_length = 3
             elif self.args.p == '4b':
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_4_bytes(cumulative_lengths, original_text_start_offset, base, 0)
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_4_bytes(cumulative_lengths, original_text_start_offset, False, base, 0)
                 pointers_length = 4
             elif self.args.p == '4bb':
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_4_bytes(cumulative_lengths, original_text_start_offset, base, 1)
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_4_bytes(cumulative_lengths, original_text_start_offset, False, base, 1)
                 pointers_length = 4
             else:
                 print("\nError: Invalid pointers format!")
