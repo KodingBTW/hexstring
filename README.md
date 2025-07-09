@@ -20,7 +20,7 @@ cd src
 build.bat
 ```
 ## Interface
-![image](https://github.com/user-attachments/assets/5733b562-6103-4d32-8df7-a58b505d75aa)
+![image](https://github.com/user-attachments/assets/1d5d8b42-5a09-47c3-a6c0-98c0e47be763)
 
 To export script:
 1. Open ROM file and tbl file
