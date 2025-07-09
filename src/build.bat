@@ -25,4 +25,5 @@ copy requirements.txt dist\
 copy LICENSE dist\
 copy ASCII.tbl dist\
 xcopy "build" "dist\src\build\" /E /I /Y
+echo "ALL PROCESS DONE!"
 pause

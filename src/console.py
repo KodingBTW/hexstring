@@ -22,7 +22,6 @@
 import sys
 import os
 from cli import CLI
-from app import app_name, version
 
     
 if __name__ == '__main__':
