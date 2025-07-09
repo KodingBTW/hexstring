@@ -27,65 +27,56 @@ class Encoder:
         end_lines=''
         with open(file, "r", encoding='UTF-8') as f:
             first_line = f.readline().strip()
-            match = re.match(r";\{([0-9A-Fa-f\-]+)\}-(.*)", first_line)
+            match = re.match(r";\{([0-9A-Fa-f\-]+)\}(?:-(.*))?", first_line)
             offsets = match.group(1)
             hex_data.extend([int(addr, 16) for addr in offsets.split('-')])
             byte = match.group(2)
-            end_lines = ",".join([f"{val}" for val in byte.split('-')])
-            
+            end_lines = ",".join(byte.split('-')) if byte else None
             script = [
                 line.rstrip('\n') for line in f.readlines()
-                if not (line.startswith(";") or line.startswith("@") or line.startswith("|"))
+                if not (line.startswith(";") or line.startswith("@") or line.startswith("|") or line.startswith("/"))
             ]
         return script, hex_data[0], hex_data[1], hex_data[2], end_lines
 
-    def read_tbl(tbl_file, bracket_index):
+    def read_tbl(tbl_file):
         """
-        Reads a .tbl file to create a character mapping table based on a given bracket index.
+        Reads a .tbl file to create a character mapping table (supports DTE/MTE, multibyte values).
         
         Parameters:
             tbl_file (str): The path to the .tbl file.
-            bracket_index (int): Index used to determine restricted characters.
         
         Returns:
             tuple: Contains:
-                - char_table (dict): A dictionary where keys are character sequences and values are their corresponding byte values.
-                - longest_char (int): The length of the longest character sequence in the table.
+                - char_table (dict): A dictionary where keys are byte sequences (as `bytes`) and values are strings (characters or sequences).
+                - chars_lengths (set): Set array with chain char lengths.
         """
-        if bracket_index == 0:
-            restricted_chars = {"~"}
-        elif bracket_index == 1:
-            restricted_chars = {"[", "]"}
-        elif bracket_index == 2:
-            restricted_chars = {"{", "}"}
-        elif bracket_index == 3:
-            restricted_chars = {"<", ">"}
-        else:
-            restricted_chars = set()
-            
         char_table = {}
-        longest_char = 0
-        
+        chars_lengths = set()
+
         with open(tbl_file, "r", encoding="UTF-8") as f:
             for line in f:
-                if line.startswith(";") or line.startswith("/"):
+                if not line or line.startswith(";") or line.startswith("/"):
                     continue
                 if "=" in line:
-                    hex_value, chars = line.split("=",1)
-                    if any(c in restricted_chars for c in chars):
-                        continue
+                    hex_value, chars = line.split("=", 1)
+                    chars = chars.strip('\n')
                     try:
-                        hex_value = int(hex_value, 16)
-                        chars = chars.strip("\n")
-                        char_table[chars] = hex_value
-                        longest_char = max(longest_char, len(chars))
+                        if len(hex_value) % 2 != 0:
+                            print(f"Warning: '{hex_value}' is invalid! Skipped.")
+                            continue
+                        byte_key = bytes.fromhex(hex_value)
+                        char_table[chars] = byte_key
+                        chars_lengths.add(len(chars))
                     except ValueError:
-                        continue
-        return char_table, longest_char
+                        print(f"Warning: '{hex_value}' is invalid! Skipped.")
+                        continue        
+        chars_lengths = sorted([l for l in chars_lengths if l > 0], reverse=True)
+        
+        return char_table, chars_lengths
 
-    def encode_script(text_script, end_lines, char_table, longest_char, not_use_end_lines, bracket_index):
+    def encode_script(text_script, end_lines, char_table, dict_lengths, not_use_end_lines, bracket_index):
         """
-        Encodes the text into bytes using DTE/MTE encoding schemes, considering the provided character table.
+        Encodes the text into bytes using DTE/MTE encoding schemes with multibyte support.
         
         Parameters:
             text_script (list): List of text strings to encode.
@@ -101,16 +92,16 @@ class Encoder:
                 - pointers (list): List of pointers (cumulative lengths).
         """
         if bracket_index == 0:
-            raw_byte = r'(~[A-Za-z0-9]+~)'
+            raw_byte = r'(~[0-9A-Fa-f]{2}~)'
             hex_code = r'~([0-9A-Fa-f]{2})~'
         elif bracket_index == 1:
-            raw_byte = r'([[A-Za-z0-9]+])'
-            hex_code = r'[([0-9A-Fa-f]{2})]'
+            raw_byte = r'(\[[0-9A-Fa-f]{2}\])'
+            hex_code = r'\[([0-9A-Fa-f]{2})\]'
         elif bracket_index == 2:
-            raw_byte = r'({[A-Za-z0-9]+})'
-            hex_code = r'{([0-9A-Fa-f]{2})}'
+            raw_byte = r'(\{[0-9A-Fa-f]{2}\})'
+            hex_code = r'\{([0-9A-Fa-f]{2})\}'
         elif bracket_index == 3:
-            raw_byte = r'(<[A-Za-z0-9]+>)'
+            raw_byte = r'(<[0-9A-Fa-f]{2}>)'
             hex_code = r'<([0-9A-Fa-f]{2})>'
 
         encoded_data = bytearray()
@@ -140,21 +131,25 @@ class Encoder:
                 elif re.match(hex_code, part):
                     processed_sub_lines.append(bytes([int(part[1:3], 16)])) 
                     total_bytes += 1
+
                 else:
                     # If is a char
                     i = 0
                     encoded_sub_lines = bytearray()
                     while i < len(part):
+                        #print(f"Position {i}: checking '{part[i:]}'")
                         # Searching for sequences based on the longest char (DTE/MTE Algorithm)
-                        for length in range(min(longest_char, len(part) - i), 0, -1):
+                        for length in dict_lengths:
                             seq = part[i:i+length]
                             if seq in char_table:
-                                encoded_sub_lines.append(char_table[seq])
-                                total_bytes += 1
+                                #Depuring(ignore)
+                                #print(f"Matched: {seq} -> {char_table[seq].hex()} (text len: {length}, encoded bytes: {len(char_table[seq])})")
+                                encoded_sub_lines.extend(char_table[seq])
+                                total_bytes += len(char_table[seq])
                                 i += length
                                 break
                         else:
-                            # Protection: if not encounter anyone encode by ASCII form.
+                            # If not encounter anyone encode by ASCII form.
                             encoded_sub_lines.append(ord(part[i]))
                             total_bytes += 1
                             i += 1
@@ -170,7 +165,7 @@ class Encoder:
             # Add the processed line to the final result
             encoded_data.extend(encoded_line)
 
-            # Split pointer by line lenght in script
+            # Split pointer by line length in script
             if not_use_end_lines:
                 cumulative_length.append(total_bytes)
             else:
@@ -181,10 +176,10 @@ class Encoder:
 
         # Remove last pointer
         cumulative_length.pop()
-        
+
         return encoded_data, len(encoded_data), cumulative_length
 
-    def calculate_pointers_2_bytes(list_cumulative_length, first_pointer, base, endianness):
+    def calculate_pointers_2_bytes(list_cumulative_length, first_pointer, relative_start, base, endianness):
         """
         Calculates pointer data by adjusting each pointer with the header size 
         and encoding them in little-endian format.
@@ -192,6 +187,7 @@ class Encoder:
         Parameters:
             list_cumulative_length (list): A list of cumulative pointer lengths to adjust.
             first_pointer (int): The first pointer to add to each cumulative length.
+            relative_start (bool): If start count is the script block or total size rom.
             base (int): The base address to subtract from each pointer.
             endianness (int): The endianness (0 for little-endian, 1 for big-endian).
 
@@ -201,6 +197,8 @@ class Encoder:
                 - data_length (int): The length of the encoded pointer data.
         """
         pointers_data = bytearray()
+        if relative_start:
+            first_pointer = 0
         pointers_list = [ptr + first_pointer for ptr in list_cumulative_length]
         pointers_list = [ptr - base for ptr in pointers_list]
         if endianness == 0:
@@ -213,13 +211,14 @@ class Encoder:
                 pointers_data.append(ptr & 0xFF)
         return pointers_data, len(pointers_data)
 
-    def calculate_pointers_2_bytes_split(list_cumulative_length, first_pointer, base):
+    def calculate_pointers_2_bytes_split(list_cumulative_length, first_pointer, relative_start, base):
         """
         Similar to calculate_pointers_2_bytes, but encodes the pointers as two separate byte arrays (LSB, MSB).
 
         Parameters:
             list_cumulative_length (list): A list of cumulative pointer lengths to adjust.
             first_pointer (int): The first pointer to add to each cumulative length.
+            relative_start (bool): If start count is the script block or total size rom.
             base (int): The base address to subtract from each pointer.
             endianness (int): The endianness (0 for little-endian, 1 for big-endian).
 
@@ -231,6 +230,8 @@ class Encoder:
         """
         lsb_ptr = bytearray()
         msb_ptr = bytearray()
+        if relative_start:
+            first_pointer = 0
         pointers_list = [ptr + first_pointer for ptr in list_cumulative_length]
         pointers_list = [ptr - base for ptr in pointers_list]
 
@@ -239,13 +240,16 @@ class Encoder:
             msb_ptr.append((ptr >> 8) & 0xFF)
         return lsb_ptr, msb_ptr, len(lsb_ptr)
 
-    def calculate_pointers_3_bytes(list_cumulative_length, first_pointer, base, endianness):
+    def calculate_pointers_3_bytes(list_cumulative_length, first_pointer, relative_start, base, endianness):
         """
-        Similar to calculate_pointers_2_bytes, but works with 3-byte pointers.
+        Calculates pointer data by adjusting each pointer with the header size 
+        and encoding them in little-endian format.
+
 
         Parameters:
             list_cumulative_length (list): A list of cumulative pointer lengths to adjust.
             first_pointer (int): The first pointer to add to each cumulative length.
+            relative_start (bool): If start count is the script block or total size rom.
             base (int): The base address to subtract from each pointer.
             endianness (int): The endianness (0 for little-endian, 1 for big-endian).
 
@@ -255,12 +259,15 @@ class Encoder:
                 - data_length (int): The length of the encoded pointer data.
         """
         pointers_data = bytearray()
+        if relative_start:
+            first_pointer = 0
         pointers_list = [ptr + first_pointer for ptr in list_cumulative_length]
+        pointers_list = [ptr - base for ptr in pointers_list]
         if endianness == 0:
-            for ptr in pointers_list:
-                pointers_data.append((ptr >> 16) & 0xFF)                 
+            for ptr in pointers_list: 
                 pointers_data.append(ptr & 0xFF)
                 pointers_data.append((ptr >> 8) & 0xFF)
+                pointers_data.append((ptr >> 16) & 0xFF)
         elif endianness == 1:
             for ptr in pointers_list:
                 pointers_data.append((ptr >> 16) & 0xFF)
@@ -268,26 +275,34 @@ class Encoder:
                 pointers_data.append(ptr & 0xFF)
         return pointers_data, len(pointers_data)
         
-    def calculate_pointers_4_bytes(list_cumulative_length, first_pointer, base, endianness):
+    def calculate_pointers_4_bytes(list_cumulative_length, first_pointer, relative_start, base, endianness):
         """
         Calculates and returns the pointer data after adjusting each pointer with the header size
         and encoding them in big-endian format.
 
         Parameters:
-            pointersList (list): A list of pointers to adjust and encode.
-            headerSize (int): The header size to subtract from each pointer.
+            list_cumulative_length (list): A list of cumulative pointer lengths to adjust.
+            first_pointer (int): The first pointer to add to each cumulative length.
+            relative_start (bool): If start count is the script block or total size rom.
+            base (int): The base address to subtract from each pointer.
+            endianness (int): The endianness (0 for little-endian, 1 for big-endian).
 
         Returns:
-            bytearray: The encoded pointer data in big-endian format.
+            tuple: A tuple containing:
+                - pointers_data (bytearray): The encoded pointer data.
+                - data_length (int): The length of the encoded pointer data.
         """
         pointers_data = bytearray()
+        if relative_start:
+            first_pointer = 0
         pointers_list = [ptr + first_pointer for ptr in list_cumulative_length]
+        pointers_list = [ptr - base for ptr in pointers_list]
         if endianness == 0:
             for ptr in pointers_list:
-                pointers_data.append((ptr >> 24) & 0xFF)     
-                pointers_data.append((ptr >> 16) & 0xFF)
                 pointers_data.append(ptr & 0xFF)
                 pointers_data.append((ptr >> 8) & 0xFF)
+                pointers_data.append((ptr >> 16) & 0xFF)
+                pointers_data.append((ptr >> 24) & 0xFF) 
         elif endianness == 1:
             for ptr in pointers_list:
                 pointers_data.append((ptr >> 24) & 0xFF)     

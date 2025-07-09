@@ -25,43 +25,32 @@ class Decoder:
         except ValueError:
             return
 
-    def read_tbl(tbl_file, bracket_index):
+    def read_tbl(tbl_file):
         """
-        Reads a .tbl file to create a character mapping table (supports DTE/MTE).
+        Reads a .tbl file to create a character mapping table (supports DTE/MTE, multibyte values).
 
         Parameters:
             tbl_file (str): The path to the .tbl file.
-            bracket_index (int): Determines the bracket style to block his use.
 
         Returns:
-            dict: A dictionary where keys are byte values (int) and values are strings (characters or sequences).
-        """
-        if bracket_index == 0:
-            restricted_chars = {"~"}
-        elif bracket_index == 1:
-            restricted_chars = {"[", "]"}
-        elif bracket_index == 2:
-            restricted_chars = {"{", "}"}
-        elif bracket_index == 3:
-            restricted_chars = {"<", ">"}
-        else:
-            restricted_chars = set()
-                 
-        char_table = {}   
+            char_table (dict): A dictionary where keys are byte sequences (as `bytes`) and values are strings (characters or sequences).
+        """               
+        char_table = {}
+        
         with open(tbl_file, "r", encoding="UTF-8") as f:
             for line in f:
-                if line.startswith(";") or line.startswith("/"):
+                if not line or line.startswith(";") or line.startswith("/"):
                     continue  
                 if "=" in line:
                     hex_value, chars = line.split("=", 1)
-                    if any(c in restricted_chars for c in chars):
-                        continue
                     try:
-                        hex_value = int(hex_value, 16)
-                        chars = chars.strip("\n")
-                        char_table[hex_value] = chars 
+                        if len(hex_value) % 2 != 0:
+                            print(f"Warning: '{hex_value}' is invalid! Skipped.")
+                            continue
+                        byte_key = bytes.fromhex(hex_value)
+                        char_table[byte_key] = chars.strip("\n")
                     except ValueError:
-                        print(f"Warning: {hex_value} invalid number!, ignored.")
+                        print(f"Warning: '{hex_value}' is invalid! Skipped.")
                         continue
         return char_table
 
@@ -84,7 +73,9 @@ class Decoder:
             if endianness == 0:
                 value = int.from_bytes(pair, byteorder='little') + base
             elif endianness == 1:
-                value = int.from_bytes(pair, byteorder='big') + base   
+                value = int.from_bytes(pair, byteorder='big') + base
+            if value < 0:
+                value = 0
             result.append(value)
         return result
 
@@ -105,6 +96,8 @@ class Decoder:
         for i in range(len(lsb)):
             pair = [lsb[i], msb[i]]
             value = int.from_bytes(pair, byteorder='little') + base
+            if value < 0:
+                value = 0
             result.append(value)
         return result
 
@@ -124,12 +117,20 @@ class Decoder:
         """
         result = []
         for i in range(0, len(data), 3):
-            triplet = data[i:i + 3]       
-            use_last_pair = triplet[1:]
+            triplet = data[i:i + 3]
+            if len(triplet) < 3:
+                continue
+            low = triplet[0]
+            high = triplet[1]
+            bank = triplet[2]
             if endianness == 0:
-                value = int.from_bytes(use_last_pair, byteorder='little') + base
+                value = int.from_bytes([low, high, bank], byteorder='little') + base
             elif endianness == 1:
-                value = int.from_bytes(use_last_pair, byteorder='big') + base
+                value = int.from_bytes([low, high, bank], byteorder='big') + base
+            elif endianness == 2:
+                value = int.from_bytes([bank, high, low], byteorder='big') + base
+            if value < 0:
+                value = 0 
             result.append(value)    
         return result
 
@@ -149,25 +150,28 @@ class Decoder:
         result = []
         for i in range(0, len(data), 4):
             quartet = data[i:i + 4]
-            use_last_pair = quartet[1:]
+            #use_last_pair = quartet[2:]
             if endianness == 0:
-                value = int.from_bytes(use_last_pair, byteorder='little') + base
+                value = int.from_bytes(quartet, byteorder='little') + base
             elif endianness == 1:
-                value = int.from_bytes(use_last_pair, byteorder='big') + base
+                value = int.from_bytes(quartet, byteorder='big') + base
+            if value < 0:
+                value = 0
             result.append(value)
+        print(result)
         return result
 
-    def decode_script(rom_data, addresses_list, end_line, char_table, ignore_end_line, bracket_index):
+    def decode_script(rom_data, addresses_list, end_line, char_table, bracket_index):
         """
-        Extracts texts from the ROM data at specified addresses until a line breaker is encountered.
-
+        Extracts texts from the ROM data at specified addresses until a end line
+        Support multi-byte
+.
         Parameters:
             rom_data (bytes): The complete ROM data.
             addresses_list (list): A list of addresses to read the texts from.
-            end_line (set): A set of byte values used as line breakers.
-            char_table (dict): A dictionary mapping byte values to characters or sequences.
-            decoded_valid_character (bool): Flag indicating if a valid character has been decoded.
-            bracket_index (int): Specifies the bracket style to use around special characters.
+            end_line (set): A set of byte values used as end_lines
+            char_table (dict): A dictionary mapping byte values or sequences to characters.
+            bracket_index (int): Specifies the bracket style to use around unknown bytes.
 
         Returns:
             tuple: Containing:
@@ -177,85 +181,70 @@ class Decoder:
         """             
         texts = []  
         lines_length = []
-        bytes_line_counter = 0
         total = 0
-        
-        #formats
+
+        # Bracket formats
         bracket_formats = {
             0: "~{0}~",
-            1: "[{0}]",  
-            2: "{{{0}}}", 
-            3: "<{0}>"  
+            1: "[{0}]",
+            2: "{{{0}}}",
+            3: "<{0}>"
         }
 
         bracket_format = bracket_formats.get(bracket_index)
 
-        for addr in addresses_list:
+        # Sort keys from .tbl
+        key_lengths = sorted({len(k) for k in char_table.keys()}, reverse=True)
+
+        for start_addr in addresses_list:
+            addr = start_addr
             text = bytearray()
-            decoded_valid_character = False
-            
-            while True:
-                byte = rom_data[addr]  
-                bytes_line_counter += 1
-
-                # If the byte is a end_line, stop extracting
-                if ignore_end_line: 
-                    if byte in end_line and decoded_valid_character:
-                        split_byte = byte
-                        break
-                else:
-                    if byte in end_line:
-                        split_byte = byte
-                        break
-
-                # Map the byte using char_table to get the character
-                char = char_table.get(byte, None)  
-                if char:
-                    # If single character
-                    if len(char) == 1:
-                        text.append(ord(char))
-                        decoded_valid_character = True
-                    # If multiple characters (DTE/MTE)
-                    else:  
-                        for c in char:
-                            text.append(ord(c))
-                        decoded_valid_character = True
-                # If byte is not in char_table use raw byte
-                else:
-                    hex_value = format(byte, '02X')
-                    bracket = bracket_format.format(hex_value)
-                    text.extend(bracket.encode('UTF-8'))
-                addr += 1
-                
-            # Add the breaker byte to the text
-            if split_byte is not None:
-                char = char_table.get(split_byte, None)
-                if char:
-                    # if assigned to a single character
-                    if len(char) == 1:
-                        text.append(ord(char))
-                    # if assigned to a chain characters
-                    else:
-                        for c in char:
-                            text.append(ord(c))
-                    # Use raw byte
-                else:
-                    hex_value = format(split_byte, '02X')
-                    bracket = bracket_format.format(hex_value)
-                    text.extend(bracket.encode('UTF-8'))
-                                     
-            # Convert byte array to string
-            decoded_text = text.decode('UTF-8', errors='replace')
-
-            # Append the decoded text to the list
-            texts.append(decoded_text)
-            lines_length.append(bytes_line_counter)
-            total = total + bytes_line_counter
             bytes_line_counter = 0
 
-        # Calculate total bytes read
-        total_bytes_read = abs((addresses_list[-1] + lines_length[-1]) - addresses_list[0])
+            while addr < len(rom_data):
+                matched = False
 
+                for length in key_lengths:
+                    if addr + length > len(rom_data):
+                        continue
+
+                    segment = rom_data[addr:addr + length]
+
+                    if segment in char_table:
+                        char = char_table[segment]
+                        text.extend(char.encode('utf-8'))
+                        addr += length
+                        bytes_line_counter += length
+
+                        # If end line
+                        if length == 1 and segment[0] in end_line:
+                            matched = True
+                            break
+                        matched = True
+                        break
+
+                if matched:
+                    if length == 1 and segment[0] in end_line:
+                        break 
+                    continue
+
+                # If raw byte
+                byte = rom_data[addr]
+                hex_value = format(byte, '02X')
+                bracket = bracket_format.format(hex_value)
+                text.extend(bracket.encode('utf-8'))
+                addr += 1
+                bytes_line_counter += 1
+
+                if byte in end_line:
+                    break
+
+            decoded_text = text.decode('utf-8', errors='replace')
+            texts.append(decoded_text)
+            lines_length.append(bytes_line_counter)
+            total += bytes_line_counter
+
+        total_bytes_read = abs((addresses_list[-1] + lines_length[-1]) - addresses_list[0])
         return texts, total_bytes_read, lines_length
 
     def decode_script_no_end_line(rom_data, addresses_list, end_offset, char_table, bracket_index):
@@ -265,8 +254,9 @@ class Decoder:
         Parameters:
             rom_data (bytes): The complete ROM data.
             addresses_list (list): A list of addresses to read the texts from.
-            end_offset (set): The final offset after the last address.
-            char_table (dict): A dictionary mapping byte values to characters or sequences.
+            end_offset (int): The final offset after the last address.
+            char_table (dict): A dictionary mapping byte sequences (bytes) to characters or sequences.
+            bracket_index (int): Specifies the bracket style to use around unknown bytes.
 
         Returns:
             tuple: Containing:
@@ -278,61 +268,56 @@ class Decoder:
         lines_length = []
         total = 0
 
-        #formats
+        # Bracket formats
         bracket_formats = {
             0: "~{0}~",
             1: "[{0}]",  
             2: "{{{0}}}", 
-            3: "<{0}>"  
+            3: "<{0}>"
         }
 
         bracket_format = bracket_formats.get(bracket_index)
 
-        # Add final offset to the addresses_list
+        # Add final offset to the addresses list
         addresses_list.append(end_offset)
 
-        # Calculate lines length of each segment is the difference between consecutive addresses
+        # Calculate line lengths
         for i in range(len(addresses_list) - 1):
             length = int(addresses_list[i + 1]) - int(addresses_list[i])
             lines_length.append(length)
 
-        # Loop over each starting address in the list and use lines_length for determining byte ranges
+        # Prepare sorted multibyte keys for efficient matching
+        sorted_keys = sorted(char_table.keys(), key=lambda k: len(k), reverse=True)
+
         for i in range(len(addresses_list) - 1):
             start_addr = addresses_list[i]
             length = lines_length[i]
             end_addr = start_addr + length          
             text = bytearray()
-            
-            # Read bytes from the starting address to the end address (using the specified length)
-            for addr in range(start_addr, end_addr):
-                byte = rom_data[addr]
+            addr = start_addr
 
-                # Map the byte using char_table to get the character
-                char = char_table.get(byte, None)  
-                if char:
-                    # If single character
-                    if len(char) == 1:
-                        text.append(ord(char))
-                    # If multiple characters (DTE/MTE)
-                    else:  
-                        for c in char:
-                            text.append(ord(c))
-                # If byte is not in char_table use raw byte
-                else:
+            while addr < end_addr:
+                matched = False
+                for key in sorted_keys:
+                    key_len = len(key)
+                    if rom_data[addr:addr + key_len] == key:
+                        text.extend(char_table[key].encode('utf-8'))
+                        addr += key_len
+                        matched = True
+                        break
+                if not matched:
+                    # Unknown byte: wrap in bracket
+                    byte = rom_data[addr]
                     hex_value = format(byte, '02X')
                     bracket = bracket_format.format(hex_value)
-                    text.extend(bracket.encode('UTF-8'))
-            
-            # Convert byte array to string
-            decoded_text = text.decode('UTF-8', errors='replace')
+                    text.extend(bracket.encode('utf-8'))
+                    addr += 1
 
-            # Append the decoded text to the list
+            decoded_text = text.decode('utf-8', errors='replace')
             texts.append(decoded_text)
             total += length
 
-        # Calculate total bytes read (this will be the sum of all lengths in lines_length)
         total_bytes_read = total
-
         return texts, total_bytes_read, lines_length
 
     def parse_end_lines(string):

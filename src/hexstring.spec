@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+from PyInstaller.utils.hooks import collect_data_files
 
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('resources/icon.ico', 'resources')],
+    datas=collect_data_files('resources', includes=['*.ico']),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['resources\\icon.ico'],
+    icon=['resources/icon.ico'],
 )

@@ -1,7 +1,5 @@
-# HexString 1.3.0 by Koda
-# 
-# This program is a tool designed for ROM hacking and script extraction/insertion.
-# It allows users to extract text from a ROM, manipulate it, and then reinsert the modified text back into the ROM.
+# This program is a tool designed for dump scripts from ROM games
+# It allows users to extract text, edit it, and then reinsert the modified text back into the ROM.
 # 
 # Features:
 # - Extract text from ROM files
@@ -10,25 +8,25 @@
 # - Configurable options for pointers, end offsets, and more
 #
 # Dependencies:
-# - PyQt5 
-# - Custom libraries for ROM reading, writing, and text decoding
+# - Check requirements.txt
 #
 # License:
 # This program is licensed under the GNU General Public License v3 (GPL-3.0).
 # You can redistribute and/or modify it under the terms of the GPL-3.0 License.
 # For more details, see the LICENSE file in the project directory.
 #
-# Author: Koda
-# Version: 1.3.0
-#
-# Date: 28-04-2025
+# Build Information:
+# Check config.py
+
 import sys
 import os
 import io
 import json
-import cli
+from config import app_name, version, author, date, hour, license, url, resources_path, icon_file
 from decoder import Decoder
 from encoder import Encoder
+from lempel_ziv import Lempel_ziv
+from analizer import Analizer
 from cli import CLI
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QSizePolicy, QSpacerItem, QMenuBar, QMenu, QGridLayout, QVBoxLayout, QWidget, QMessageBox, QPlainTextEdit, QTabWidget, QLineEdit, QFileDialog, QLabel, QPushButton, QHBoxLayout, QGroupBox, QRadioButton, QComboBox, QCheckBox, QToolTip, QTextEdit, QDialog, QDialogButtonBox, QProgressBar
 from PyQt5.QtGui import QIcon, QRegExpValidator
@@ -39,7 +37,7 @@ from ctypes import windll
 class Functions:
     def __init__(self, main_window):
         self.main_window = main_window
-
+        
     def reset_fields(self):
         # Uncompressed Text Fields
         self.main_window.selected_rom_file_name.clear()
@@ -56,7 +54,6 @@ class Functions:
 
         # Advanced Options Fields (Uncompressed Text Fields)
         self.main_window.not_comment_lines_checkbox.setChecked(False)
-        self.main_window.use_custom_brackets_for_hex_codes_checkbox.setChecked(False) 
         self.main_window.use_custom_brackets_for_hex_codes_list.setCurrentIndex(0)
         self.main_window.fill_free_space_byte_checkbox.setChecked(False)
         self.main_window.fill_free_space_byte_input.setText("FF")  
@@ -64,12 +61,31 @@ class Functions:
         self.main_window.lsb_offset_input.clear()
         self.main_window.msb_offset_input.clear()
         self.main_window.size_input.clear()   
-        self.main_window.ignore_end_line_checkbox.setChecked(False)
         self.main_window.not_use_end_line_checkbox.setChecked(False)
+
+        # Compressed Text Tools Fields
+        self.main_window.use_compression_algorithm_method_checkbox.setChecked(False)
+        self.main_window.compression_method_list.setCurrentIndex(0)
+        self.main_window.compression_type_list.setCurrentIndex(0)
+        
+        # Script analisys tools Fields
+        self.main_window.search_combination_checkbox.setChecked(False)
+        self.main_window.compare_to_dictionary_list.setCurrentIndex(0)
+        self.main_window.max_frecuencies_input.setText("99")
+        self.main_window.max_char_lenght_input.setText("2")
+        self.main_window.characters_counter_output.clear()
+        self.main_window.unused_characters_output.clear()
+        self.main_window.best_combinations_output.clear()
 
         # Set buttons disabled
         self.main_window.extract_button.setDisabled(True)
         self.main_window.insert_button.setDisabled(True)
+
+        # Reset Progress Bar
+        self.main_window.progress_bar.setValue(0)
+        
+        # Reset Console
+        self.main_window.show_console.clear()
         
     def create_prefix_label(self):
         prefix_label = QLabel("0x")
@@ -92,7 +108,9 @@ class Functions:
         is_checked = self.main_window.expand_button.isChecked()
         self.main_window.advanced_options_container.setVisible(is_checked)
         self.main_window.expand_button.setText("Hide Advanced Options" if is_checked else "Show Advanced Options")
-        self.main_window.setFixedSize(475, 875) if is_checked else self.main_window.setFixedSize(475, 667)
+        #self.main_window.dump_text_tab.setMaximumHeight(627)
+        #self.main_window.tabs.setMaximumHeight(656)
+        self.main_window.setFixedSize(475, 866) if is_checked else self.main_window.setFixedSize(475, 720)
         
     def toggle_split_pointers(self, state):
         is_checked = self.main_window.use_split_pointers_checkbox.isChecked()
@@ -115,30 +133,32 @@ class Functions:
         for widget in widgets_to_enable:
             widget.setEnabled(enable)
 
-    def toggle_ignore_end_line_before_decoding(self, state):
-        is_checked = self.main_window.ignore_end_line_checkbox.isChecked()
-        self.main_window.not_use_end_line_checkbox.setDisabled(not is_checked)
-        self.main_window.not_use_end_line_checkbox.setEnabled(not is_checked)
-
     def toggle_not_use_end_line(self, state):
         is_checked = self.main_window.not_use_end_line_checkbox.isChecked()
-        self.main_window.ignore_end_line_checkbox.setDisabled(not is_checked)
         self.main_window.end_line_label.setDisabled(not is_checked)
         self.main_window.end_line_input.setDisabled(not is_checked)
-        self.main_window.ignore_end_line_checkbox.setEnabled(not is_checked)
         self.main_window.end_line_label.setEnabled(not is_checked)
         self.main_window.end_line_input.setEnabled(not is_checked)
-
-    def toggle_custom_brackets(self, state):
-        is_checked = self.main_window.use_custom_brackets_for_hex_codes_checkbox.isChecked()
-        self.main_window.use_custom_brackets_for_hex_codes_list.setEnabled(not is_checked)
-        self.main_window.use_custom_brackets_for_hex_codes_list.setDisabled(not is_checked)
 
     def toggle_fill_free_space(self, state):
         is_checked = self.main_window.fill_free_space_byte_checkbox.isChecked()
         self.main_window.fill_free_space_byte_input.setEnabled(not is_checked)
         self.main_window.fill_free_space_byte_input.setDisabled(not is_checked)
-    
+
+    def toggle_use_compression_method_options(self, state):
+        is_checked = self.main_window.use_compression_algorithm_method_checkbox.isChecked()
+        self.main_window.compression_method_list.setEnabled(not is_checked)
+        self.main_window.compression_type_list.setEnabled(not is_checked)
+        self.main_window.compression_method_list.setDisabled(not is_checked)
+        self.main_window.compression_type_list.setDisabled(not is_checked)
+
+    def toggle_seach_combinations(self, state):
+        is_checked = self.main_window.search_combination_checkbox.isChecked()
+        self.main_window.max_frecuencies_input.setEnabled(not is_checked)
+        self.main_window.max_char_lenght_input.setEnabled(not is_checked)
+        self.main_window.max_frecuencies_input.setDisabled(not is_checked)
+        self.main_window.max_char_lenght_input.setDisabled(not is_checked)
+
     def show_error_dialog(self, message):
         error_dialog = QMessageBox(self.main_window)
         error_dialog.setIcon(QMessageBox.Critical)
@@ -166,16 +186,25 @@ class Functions:
             self.main_window.insert_button.setDisabled(False)
         else:
             self.main_window.insert_button.setDisabled(True)
+
+    @staticmethod
+    def update_compression_types(index, type_combobox):
+        type_combobox.clear()
+        if index == 0:  # Lempel-Ziv
+            type_combobox.addItems(["LZ77", "LZSS", "LZW"])
+        elif index == 1:  # Golomb
+            type_combobox.addItems(["4 bits", "5 bits"])               
         
     def process_extraction(self, out_file):
         # CONSTANTS OPTIONS
+        self.main_window.progress_bar.setVisible(True)
+        self.main_window.progress_bar.setValue(0)
+        use_compression_algorithm = self.main_window.use_compression_algorithm_method_checkbox.isChecked()
         no_comments_lines = self.main_window.not_comment_lines_checkbox.isChecked()
-        use_custom_brackets = self.main_window.use_custom_brackets_for_hex_codes_checkbox.isChecked()
         bracket_index = self.main_window.use_custom_brackets_for_hex_codes_list.currentIndex()     
         use_split_pointers_method = self.main_window.use_split_pointers_checkbox.isChecked()
-        ignore_end_lines_code_until_decode = self.main_window.ignore_end_line_checkbox.isChecked()
         no_use_end_lines_for_split = self.main_window.not_use_end_line_checkbox.isChecked()
-        endianness = self.main_window.endianness_list.currentIndex()
+        endianness = self.main_window.endianness_list.currentIndex() 
 
         try:
             # VARIABLE OPTIONS
@@ -189,12 +218,14 @@ class Functions:
             base = int(self.main_window.pointers_base_input.text(), 16)
             rom_file = self.main_window.selected_rom_file_name.text()
             tbl_file = self.main_window.selected_tbl_file_name.text()
+            self.main_window.progress_bar.setValue(5)
             
         except (ValueError, UnboundLocalError):
             self.show_error_dialog("Please fill in all required fields.")
             print("Error: Extraction aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
-
+        
         #GET POINTERS
         if use_split_pointers_method:
             try:
@@ -204,10 +235,13 @@ class Functions:
             except (ValueError, UnboundLocalError):
                 self.show_error_dialog("Please fill in all required fields.")
                 print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
             lsb = Decoder.read_rom(rom_file, lsb_ptr_offset, split_ptr_size)
             msb = Decoder.read_rom(rom_file, msb_ptr_offset, split_ptr_size)
-            format_pointers = Decoder.process_pointers_split_2_bytes(lsb, msb, base)     
+            format_pointers = Decoder.process_pointers_split_2_bytes(lsb, msb, base)
+            for ptr in format_pointers:
+                print(f"Pointer: 0x{ptr:06X}")
         else:
             try:
                 pointers_start_offset = int(self.main_window.pointers_start_offset_input.text(), 16)
@@ -215,6 +249,7 @@ class Functions:
             except (ValueError, UnboundLocalError):
                 self.show_error_dialog("Please fill in all required fields.")
                 print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
             if pointers_start_offset > pointers_end_offset:
                 self.show_error_dialog("Pointers start offset can't be higher than pointers end offset.")
@@ -223,79 +258,139 @@ class Functions:
             pointers_size = pointers_end_offset - pointers_start_offset + 1
             try:
                 table_pointers = Decoder.read_rom(rom_file, pointers_start_offset, pointers_size)
-            except FileNotFoundError as e:
+            except Exception as e:
                 self.show_error_dialog(f"{e}")
                 print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
                        
             if self.main_window.radio_2_bytes.isChecked():
                 format_pointers = Decoder.process_pointers_2_bytes(table_pointers, base, endianness)
-                pointers_lenght = 2
+                pointers_length = 2
                 
             elif self.main_window.radio_3_bytes.isChecked():
                 format_pointers = Decoder.process_pointers_3_bytes(table_pointers, base, endianness)
-                pointers_lenght = 3
+                pointers_length = 3
                 
             elif self.main_window.radio_4_bytes.isChecked():                
                 format_pointers = Decoder.process_pointers_4_bytes(table_pointers, base, endianness)
-                pointers_lenght = 4
+                pointers_length = 4
+        self.main_window.progress_bar.setValue(10)
 
         # Load ROM data to RAM
         try:
             rom_data = Decoder.read_rom(rom_file, 0, os.path.getsize(rom_file))
-        except FileNotFoundError as e:
+            self.main_window.progress_bar.setValue(15)
+        except Exception as e:
             self.show_error_dialog(f"{e}")
             print("Error: Extraction aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
-
-        # Check bracket
-        if not use_custom_brackets:
-            bracket_index = 0
-
+        
         # Load char table to RAM
         try:
-            char_table = Decoder.read_tbl(tbl_file, bracket_index)
-        except FileNotFoundError as e:
+            char_table = Decoder.read_tbl(tbl_file)
+            self.main_window.progress_bar.setValue(20)
+        except Exception as e:
             self.show_error_dialog(f"{e}")
             print("Error: Extraction aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
 
-        # Decode Script
-        if no_use_end_lines_for_split:
-            script, total_bytes_read, lines_lenght = Decoder.decode_script_no_end_line(rom_data, format_pointers, text_end_offset + 1, char_table, bracket_index)            
+        # Decompress Script (if needed)
+        if not use_compression_algorithm:
+            pass
         else:
             try:
-                end_line = Decoder.parse_end_lines(self.main_window.end_line_input.text())
-            except (ValueError, UnboundLocalError):
-                self.show_error_dialog("Please fill in all required fields.")
-                print("Error: Extraction aborted!")
-                return    
-            script, total_bytes_read, lines_lenght = Decoder.decode_script(rom_data, format_pointers, end_line, char_table, ignore_end_lines_code_until_decode, bracket_index)
+                selected_method = self.main_window.compression_method_combobox.currentIndex()
+                type_index = self.main_window.compression_type_combobox.currentIndex()
+                # Lempel-Ziv
+                if selected_method == 0:
+                    # LZ77
+                    if type_index == 0:
+                        rom_data, rom_data_size, rom_data_end_offset, original_data_size = Lempel_ziv.decompress_lz77(rom_data, text_start_offset)
+                    # LZSS
+                    elif type_index == 1:
+                        rom_data, rom_data_size, rom_data_end_offset, original_data_size = Lempel_ziv.decompress_lzss(rom_data, text_start_offset)
+                    # LZW
+                    elif type_index == 2:
+                        rom_data, rom_data_size, rom_data_end_offset, original_data_size = Lempel_ziv.decompress_lzw(rom_data, text_start_offset, 12)
 
+                # Golomb Rice
+                elif selected_method == 1:
+                    # 4 BITS
+                    if type_index == 0:
+                        pass
+                    # 5 BITS
+                    elif type_index == 1:
+                        pass
+                text_size = rom_data_size
+                text_end_offset = rom_data_size - 1
+                self.main_window.progress_bar.setValue(60)
+            except Exception as e:
+                self.show_error_dialog(f"Decompression error: {e}")
+                print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
+                return
+                              
+        # Decode Script
+        try:
+            if no_use_end_lines_for_split:
+                script, total_bytes_read, lines_length = Decoder.decode_script_no_end_line(
+                    rom_data, format_pointers, text_end_offset + 1, char_table, bracket_index
+                )
+            else:
+                try:
+                    end_line = Decoder.parse_end_lines(self.main_window.end_line_input.text())
+                except (ValueError, UnboundLocalError):
+                    self.show_error_dialog("Please fill in all required fields.")
+                    print("Error: Extraction aborted!")
+                    self.main_window.progress_bar.setValue(0)
+                    return
+
+                script, total_bytes_read, lines_length = Decoder.decode_script(
+                    rom_data, format_pointers, end_line, char_table, bracket_index
+                )
+
+        except IndexError:
+            self.show_error_dialog("Pointers out of ROM size.")
+            self.main_window.progress_bar.setValue(0)
+            return
+
+        self.main_window.progress_bar.setValue(80)
+        
         # Write Script
+        if use_compression_algorithm and rom_data_size != 0:
+            print(f"COMPRESSED SIZE: {original_data_size} / {hex(original_data_size)} bytes.")
+            print(f"DECOMPRESSED SIZE: {rom_data_size} / {hex(rom_data_size)} bytes.")
+            print(f"RATIO: {abs(original_data_size - rom_data_size) / rom_data_size}, FINAL OFFSET: {hex(rom_data_end_offset)}")
         if use_split_pointers_method and no_use_end_lines_for_split:
-            decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_lenght, None, no_comments_lines)
+            decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_length, None, no_comments_lines)
             print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size) * 2} bytes. Located {split_ptr_size} pointers.")
+            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size * 2)} bytes. Located {split_ptr_size} pointers.")
         elif use_split_pointers_method:
-            decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_lenght, end_line, no_comments_lines)
+            decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_length, end_line, no_comments_lines)
             print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size) * 2} bytes. Located {split_ptr_size} pointers.")
+            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size * 2)} bytes. Located {split_ptr_size} pointers.")
         elif no_use_end_lines_for_split:
-            decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_lenght, None, no_comments_lines)
+            decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_length, None, no_comments_lines)
             print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_lenght} pointers.")
+            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_length} pointers.")
         else:
-            decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_lenght, end_line, no_comments_lines)
+            decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_length, end_line, no_comments_lines)
             print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_lenght} pointers.")
+            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_length} pointers.")
+        self.main_window.progress_bar.setValue(100)
         self.show_success_dialog("Script extracted successfully!")
         print("Script extracted successfully!")
+        self.main_window.progress_bar.setValue(0)
             
     def process_insertion(self, rom_file):
         # CONSTANTS OPTIONS
+        self.main_window.progress_bar.setVisible(True)
+        self.main_window.progress_bar.setValue(0)
+        use_compression_algorithm = self.main_window.use_compression_algorithm_method_checkbox.isChecked()
         no_comments_lines = self.main_window.not_comment_lines_checkbox.isChecked()
-        bracket_index = self.main_window.use_custom_brackets_for_hex_codes_list.currentIndex()
         bracket_index = self.main_window.use_custom_brackets_for_hex_codes_list.currentIndex()
         fill_free_space = self.main_window.fill_free_space_byte_checkbox.isChecked()
         if not fill_free_space and self.main_window.fill_free_space_byte_input.text() == "":
@@ -304,8 +399,9 @@ class Functions:
             try:
                 fill_free_space_byte = bytes([int(self.main_window.fill_free_space_byte_input.text(), 16)])
             except ValueError:
-                self.show_error_dialog(f"Fill byte is empty.")
+                self.show_error_dialog("Fill byte is empty.")
                 print("Error: Insertion aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
         not_use_end_lines = self.main_window.not_use_end_line_checkbox.isChecked()
         endianness = self.main_window.endianness_list.currentIndex()
@@ -317,48 +413,95 @@ class Functions:
             if original_text_start_offset > original_text_end_offset:
                 self.show_error_dialog("Text start offset can't be higher than text end offset.")
                 print("Error: Insertion aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return 
             original_text_size = original_text_end_offset - original_text_start_offset + 1
             base = int(self.main_window.pointers_base_input.text(), 16)
             rom_file = self.main_window.selected_rom_file_name.text()
             tbl_file = self.main_window.selected_tbl_file_name.text()
             script_file = self.main_window.selected_script_file_name.text()
+            self.main_window.progress_bar.setValue(5)
         except (ValueError, UnboundLocalError):
             self.show_error_dialog("Please fill in all required fields.")
             print("Error: Insertion aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
-
+        
         # Read Script file
         try:
             new_script, ignore1, ignore2, ignore3, ignore4 = Encoder.read_script(script_file)
-        except FileNotFoundError as e:
+            self.main_window.progress_bar.setValue(10)
+        except Exception as e:
             self.show_error_dialog(f"{e}")
             print("Error: Insertion aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
 
         # Parse line breakers.
         if not not_use_end_lines:
             try:
                 end_line = Decoder.parse_end_lines(self.main_window.end_line_input.text())
+                self.main_window.progress_bar.setValue(15)
             except ValueError:
                 self.show_error_dialog("Please fill in all required fields.")
                 print("Error: Insertion aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
                          
         # Load the character table
         try:
-            char_table, longest_char = Encoder.read_tbl(tbl_file, bracket_index)
-        except FileNotFoundError as e:
+            char_table, longest_char = Encoder.read_tbl(tbl_file)
+            self.main_window.progress_bar.setValue(20)
+        except Exception as e:
             self.show_error_dialog(f"{e}")
             print("Error: Insertion aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
 
         # Encode Text
         if not_use_end_lines:
-            new_script_data, new_script_size, cumulative_lenghts = Encoder.encode_script(new_script, None, char_table, longest_char, not_use_end_lines, bracket_index)
+            new_script_data, new_script_size, cumulative_lengths = Encoder.encode_script(new_script, None, char_table, longest_char, not_use_end_lines, bracket_index)
         else:
-            new_script_data, new_script_size, cumulative_lenghts = Encoder.encode_script(new_script, end_line, char_table, longest_char, not_use_end_lines, bracket_index)
+            new_script_data, new_script_size, cumulative_lengths = Encoder.encode_script(new_script, end_line, char_table, longest_char, not_use_end_lines, bracket_index)
+        self.main_window.progress_bar.setValue(50)
 
+        # Compress Text (If needed)
+        if not use_compression_algorithm:
+            relative_start = False
+            self.main_window.progress_bar.setValue(90)
+        else:
+            try:
+                selected_method = self.main_window.compression_method_combobox.currentIndex()
+                type_index = self.main_window.compression_type_combobox.currentIndex()
+                # Lempel-Ziv
+                if selected_method == 0:
+                    # LZ77
+                    if type_index == 0:
+                        new_script_data, compressed_new_script_size, decompressed_script_size = Lempel_ziv.compress_lz77(new_script_data)
+                    # LZSS
+                    elif type_index == 1:
+                        new_script_data, compressed_new_script_size, decompressed_script_size = Lempel_ziv.compress_lzss(new_script_data)
+                    # LZW
+                    elif type_index == 2:
+                        new_script_data, compressed_new_script_size, decompressed_script_size = Lempel_ziv.compress_lzw(new_script_data, 12)
+
+                # Golomb Rice
+                elif selected_method == 1:
+                    # 4 BITS
+                    if type_index == 0:
+                        pass
+                    # 5 BITS
+                    elif type_index == 1:
+                        pass
+                new_script_size = compressed_new_script_size
+                relative_start = True
+                self.main_window.progress_bar.setValue(90)
+            except Exception as e:
+                self.show_error_dialog(f"Compression error: {e}")
+                print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
+                return
+            
         # Format Pointers
         if self.main_window.use_split_pointers_checkbox.isChecked():
             original_pointers_start_offset = int(self.main_window.lsb_offset_input.text(), 16)
@@ -366,9 +509,10 @@ class Functions:
             if original_pointers_start_offset > original_pointers_end_offset:
                 self.show_error_dialog("Pointers start offset can't be higher than pointers end offset.")
                 print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
             original_pointers_size = int(self.main_window.size_input.text(), 16)
-            new_pointers_data_lsb, new_pointers_data_msb, new_pointers_size = Encoder.calculate_pointers_2_bytes_split(cumulative_lenghts, original_text_start_offset, base)
+            new_pointers_data_lsb, new_pointers_data_msb, new_pointers_size = Encoder.calculate_pointers_2_bytes_split(cumulative_lengths, original_text_start_offset, relative_start, base)
         else:
             try:
                 original_pointers_start_offset = int(self.main_window.pointers_start_offset_input.text(), 16) 
@@ -376,50 +520,112 @@ class Functions:
             except (ValueError, UnboundLocalError):
                 self.show_error_dialog("Please fill in all required fields.")
                 print("Error: Insertion aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return    
             if original_pointers_end_offset < original_pointers_start_offset:
                 self.show_error_dialog(f"Error invalid offsets!")
                 print("Error: Insertion aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return
             original_pointers_size = original_pointers_end_offset - original_pointers_start_offset + 1
             if self.main_window.radio_2_bytes.isChecked():
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_2_bytes(cumulative_lenghts, original_text_start_offset, base, endianness)
-                pointers_lenght = 2
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_2_bytes(cumulative_lengths, original_text_start_offset, relative_start, base, endianness)
+                pointers_length = 2
                 
             elif self.main_window.radio_3_bytes.isChecked():
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_3_bytes(cumulative_lenghts, original_text_start_offset, base, endianness)
-                pointers_lenght = 3
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_3_bytes(cumulative_lengths, original_text_start_offset, relative_start, base, endianness)
+                pointers_length = 3
                 
             elif self.main_window.radio_4_bytes.isChecked():                
-                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_4_bytes(cumulative_lenghts, original_text_start_offset, base, endianness)
-                pointers_lenght = 4
+                new_pointers_data, new_pointers_size = Encoder.calculate_pointers_4_bytes(cumulative_lengths, original_text_start_offset, relative_start, base, endianness)
+                pointers_length = 4
+            self.main_window.progress_bar.setValue(90)
                 
         # Write ROM
         if new_script_size > original_text_size:
+            self.main_window.progress_bar.setValue(100)
+            self.show_error_dialog(f"ERROR: script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
             print(f"ERROR: script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
+            self.main_window.progress_bar.setValue(0)
             return
         if new_pointers_size > original_pointers_size:
-            print(f"ERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)//2} lines in script.")
+            self.main_window.progress_bar.setValue(100)
+            self.show_error_dialog(f"ERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)} lines in script.")
+            print(f"ERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)} lines in script.")
+            self.main_window.progress_bar.setValue(0)
             return
+        if use_compression_algorithm and decompressed_script_size != 0:
+            print(f"COMPRESSED SIZE: {compressed_new_script_size} / {hex(compressed_new_script_size)} bytes.")
+            print(f"DECOMPRESSED SIZE: {decompressed_script_size} / {hex(decompressed_script_size)} bytes.")
+            print(f"RATIO: {abs(compressed_new_script_size - decompressed_script_size) / decompressed_script_size}")
         try:
             free_space_script = Encoder.write_rom(rom_file, original_text_start_offset, original_text_size, new_script_data, fill_free_space, fill_free_space_byte)
             print(f"Script text write to address {hex(original_text_start_offset)}, {free_space_script} bytes free.")
-        except FileNotFoundError as e:
+        except Exception as e:
             self.show_error_dialog(f"{e}")
             print("Error: Insertion aborted!")
+            self.main_window.progress_bar.setValue(0)
             return
             
         if not self.main_window.use_split_pointers_checkbox.isChecked():
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data, fill_free_space, fill_free_space_byte)
-            print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//pointers_lenght} lines/pointers left.")
+            print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//pointers_length} lines/pointers left.")
 
         else:
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data_lsb, fill_free_space, fill_free_space_byte)
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_end_offset, original_pointers_size, new_pointers_data_msb, fill_free_space, fill_free_space_byte)
             print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//2} lines/pointers left.")
+
+        self.main_window.progress_bar.setValue(100)
         self.show_success_dialog("Script inserted successfully!")
         print("Script inserted successfully!")
-               
+        self.main_window.progress_bar.setValue(0)
+
+    def process_script_analysis(self, script_file):
+        self.main_window.best_combinations_output.clear()
+        search_combinations = self.main_window.search_combination_checkbox.isChecked()
+        bracket_index = self.main_window.use_custom_brackets_for_hex_codes_list.currentIndex()
+        dictionary_index = self.main_window.compare_to_dictionary_list.currentIndex()
+        try:
+            script_file = self.main_window.selected_script_file_name.text()
+            script_file = Analizer.read_script(script_file)
+            self.main_window.progress_bar.setValue(10)
+        except Exception as e:
+            self.show_error_dialog(f"{e}")
+            print("Error: Analysis aborted!")
+            self.main_window.progress_bar.setValue(0)
+            return
+
+        single_characters = Analizer.character_counter(script_file, bracket_index)
+        unused_characters = Analizer.unused_characters(single_characters, dictionary_index)
+             
+        formatted_single_characters = Analizer.format_display(single_characters)
+        formatted_unused_characters = Analizer.format_display(unused_characters)
+        
+        self.main_window.characters_counter_output.setPlainText(formatted_single_characters)
+        self.main_window.unused_characters_output.setPlainText(formatted_unused_characters)
+        self.main_window.progress_bar.setValue(20)
+
+        if search_combinations:
+            try:
+                max_frecuencies = int(self.main_window.max_frecuencies_input.text())
+                max_char = int(self.main_window.max_char_lenght_input.text())
+            except (ValueError, UnboundLocalError):
+                self.main_window.characters_counter_output.clear()
+                self.main_window.unused_characters_output.clear()
+                self.show_error_dialog("Please fill in all required fields.")
+                print("Error: Analysis aborted!")
+                self.main_window.progress_bar.setValue(0)
+                return
+            mte_optimizer = Analizer.multi_length_mte_counter(script_file, bracket_index, max_frecuencies, max_char)
+            formatted_mte_optimizer = Analizer.format_display(mte_optimizer)
+            self.main_window.best_combinations_output.setPlainText(formatted_mte_optimizer)
+        
+        self.main_window.progress_bar.setValue(100)
+        self.show_success_dialog("Done!")
+        print("Done!")   
+        self.main_window.progress_bar.setValue(0)
+        
 class Console(io.StringIO):
     def __init__(self, console):
         super().__init__()
@@ -433,16 +639,6 @@ class FileHandler:
     def __init__(self, main_window):
         self.main_window = main_window
         self.functions = Functions(main_window)
-
-##    def dragEnterEvent(self, event):
-##        if event.mimeData().hasUrls():
-##            event.accept()
-##        else:
-##            event.ignore()
-##
-##    def dropEvent(self, event):
-##        file_path = event.mimeData().urls()[0].toLocalFile()
-##        self.open_config(file_path)
 
     def open_config(self):
         options = QFileDialog.Options()
@@ -482,32 +678,53 @@ class FileHandler:
                     self.main_window.size_input.setText(config_data.get("split_ptr_size", ""))
 
                     # Advanced Options Config
-                    self.main_window.not_comment_lines_checkbox.setChecked(config_data.get("no_use_comments_lines", False))
-                    self.main_window.use_custom_brackets_for_hex_codes_checkbox.setChecked(config_data.get("use_custom_brackets", False))
-                    self.main_window.use_custom_brackets_for_hex_codes_list.setCurrentIndex(config_data.get("brackets", 0))
+                    self.main_window.use_custom_brackets_for_hex_codes_list.setCurrentIndex(config_data.get("brackets", ""))
+                    self.main_window.not_comment_lines_checkbox.setChecked(config_data.get("no_use_comments_lines", False)) 
                     self.main_window.fill_free_space_byte_checkbox.setChecked(config_data.get("fill_free_space", False))
                     self.main_window.use_split_pointers_checkbox.setChecked(config_data.get("use_split_pointers", False))
-                    self.main_window.ignore_end_line_checkbox.setChecked(config_data.get("ignore_end_line", False))
                     self.main_window.not_use_end_line_checkbox.setChecked(config_data.get("not_use_end_line", False))
 
-                print("Config imported successfully!")
+                    # Compression Tools Config
+                    self.main_window.use_compression_algorithm_method_checkbox.setChecked(config_data.get("use_compression_method", False)) 
+                    self.main_window.compression_method_list.setCurrentIndex(config_data.get("compression_algorithm", 0))
+                    self.main_window.compression_type_list.setCurrentIndex(config_data.get("compression_variant", 0))
+
+                    # Analysis Tools Config
+                    self.main_window.compare_to_dictionary_list.setCurrentIndex(config_data.get("compare_to_dictionary", 0))
+                    self.main_window.search_combination_checkbox.setChecked(config_data.get("search_combinations", False))
+                    if "max_frecuencies" in config_data:
+                        self.main_window.max_frecuencies_input.setText(config_data["max_frecuencies"])
+
+                    if "max_char_lenght" in config_data:
+                        self.main_window.max_char_lenght_input.setText(config_data["max_char_lenght"])
+                
                 self.functions.enable_extract_button()
                 self.functions.enable_insert_button()
+                print("Config imported successfully!")
             except Exception as e:
-                self.functions.show_error_dialog("Error importing config")
+                self.functions.enable_extract_button()
+                self.functions.enable_insert_button()
+                self.functions.show_error_dialog(f"Error importing config {e}")
                 print(f"Error importing config: {e}")
                 return
 
     def save_config(self):
         options = QFileDialog.Options()
+        script_file = self.main_window.selected_script_file_name.text()
         rom_file = self.main_window.selected_rom_file_name.text()
-        if rom_file:
+        if script_file:
+            file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", os.path.splitext(script_file)[0] + "_config", "Config files (*.json);;All Files (*)", options=options)
+        elif rom_file:
             file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", os.path.splitext(rom_file)[0] + "_config", "Config files (*.json);;All Files (*)", options=options)
         else:
             file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", "config", "Config files (*.json);;All Files (*)", options=options)
         if file_name:
             try:
                 config_data = {}
+                
+                # Program Data
+                config_data["app_name"] = app_name
+                config_data["version"] = version
 
                 # Select Files Configs
                 rom_file_path = self.main_window.selected_rom_file_name.text().strip()
@@ -577,18 +794,36 @@ class FileHandler:
 
                 # Advanced Options Configs
                 config_data["no_use_comments_lines"] = self.main_window.not_comment_lines_checkbox.isChecked()
-                config_data["use_custom_brackets"] = self.main_window.use_custom_brackets_for_hex_codes_checkbox.isChecked()
                 config_data["brackets"] = self.main_window.use_custom_brackets_for_hex_codes_list.currentIndex()
                 config_data["fill_free_space"] = self.main_window.fill_free_space_byte_checkbox.isChecked()           
                 config_data["use_split_pointers"] = self.main_window.use_split_pointers_checkbox.isChecked()
-                config_data["ignore_end_line"] = self.main_window.ignore_end_line_checkbox.isChecked()
                 config_data["not_use_end_line"] = self.main_window.not_use_end_line_checkbox.isChecked()
 
+                # Compression tools configs
+                
+                config_data["use_compression_method"] = self.main_window.use_compression_algorithm_method_checkbox.isChecked()
+                config_data["compression_algorithm"] = self.main_window.compression_method_list.currentIndex()
+                config_data["compression_variant"] = self.main_window.compression_type_list.currentIndex()
+
+                # Analysis tools configs
+
+                config_data["compare_to_dictionary"] = self.main_window.compare_to_dictionary_list.currentIndex()
+                config_data["search_combinations"] = self.main_window.search_combination_checkbox.isChecked()
+
+                max_frecuencies = self.main_window.max_frecuencies_input.text().strip()
+                if max_frecuencies:
+                    config_data["max_frecuencies"] = max_frecuencies
+
+                max_char_lenght = self.main_window.max_char_lenght_input.text().strip()
+                if max_char_lenght:
+                    config_data["max_char_lenght"] = max_char_lenght
+        
+                # Save
                 with open(file_name, 'w') as file:
                     json.dump(config_data, file, indent=4)
                 print("Config exported successfully!")
             except Exception as e:
-                self.functions.show_error_dialog("Error exporting config")
+                self.functions.show_error_dialog(f"Error exporting config {e}")
                 print(f"Error exporting config: {e}")
                 return
 
@@ -614,7 +849,7 @@ class FileHandler:
                 self.functions.enable_extract_button()
                 self.functions.enable_insert_button()
         except Exception as e:
-            self.functions.show_error_dialog("Error selecting ROM file: {e}")
+            self.functions.show_error_dialog(f"Error selecting ROM file: {e}")
             print(f"Error selecting ROM file: {e}")
             return
 
@@ -629,7 +864,7 @@ class FileHandler:
                 self.functions.enable_extract_button()
                 self.functions.enable_insert_button()
         except Exception as e:
-            self.functions.show_error_dialog("Error selecting TBL file: {e}")
+            self.functions.show_error_dialog(f"Error selecting TBL file: {e}")
             print(f"Error selecting TBL file: {e}")
             return
 
@@ -643,7 +878,7 @@ class FileHandler:
                 print(f"Selected Script: {script_file}")
                 self.functions.enable_insert_button()
         except Exception as e:
-            self.functions.show_error_dialog("Error selecting Script file: {e}")
+            self.functions.show_error_dialog(f"Error selecting Script file: {e}")
             print(f"Error selecting Script file: {e}")
             return
 
@@ -661,8 +896,8 @@ class FileHandler:
             if out_file:
                 print(f"Output file selected: {out_file}")
                 self.functions.process_extraction(out_file)
-        except Exception as e:
-            self.functions.show_error_dialog("Error selecting Output file: {e}")
+        except ValueError as e:
+            self.functions.show_error_dialog(f"Error selecting Output file: {e}")
             print(f"Error selecting Output file: {e}")
             return
 
@@ -675,24 +910,16 @@ class MyWindow(QMainWindow):
         self.file_handler = FileHandler(self)
 
         # Initial setup
-        self.setWindowTitle('HexString v1.3.0')   
-        icon_path = os.path.join('resources', 'icon.ico')
+        self.setWindowTitle(f"{app_name} v{version}")   
+        icon_path = os.path.join(resources_path, icon_file)
         self.setWindowIcon(QIcon(icon_path))
         
-        self.setFixedSize(475, 667)  #475, 667
+        self.setFixedSize(475, 720)  #475, 720
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
-
-        self.tabs = QTabWidget(self)
         central_layout = QVBoxLayout()
-        central_layout.addWidget(self.tabs)
+        self.tabs = QTabWidget(self)
 
-##        self.progress_bar = QProgressBar(self)
-##        self.progress_bar.setRange(0, 100)
-##        self.progress_bar.setValue(0) 
-##        self.progress_bar.setVisible(False)
-##        central_layout.addWidget(self.progress_bar)
-        
         # Create tab environmnet
         self.create_tabs()
         central_widget.setLayout(central_layout)
@@ -701,15 +928,18 @@ class MyWindow(QMainWindow):
         # Configure tooltip
         QApplication.instance().setStyleSheet("QToolTip { background-color: yellow; color: black; border: 1px solid black; }")
 
-        # Drop configs (experimental)
-        #self.setAcceptDrops(True)
-
-##    def dragEnterEvent(self, event):
-##        self.file_handler.dragEnterEvent(event)
-##
-##    def dropEvent(self, event):
-##        self.file_handler.dropEvent(event)
+        # Progress Bar
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFixedHeight(20)
+        self.progress_bar.setVisible(True)
         
+        # Main window sketch
+        central_layout.addWidget(self.tabs)
+        central_layout.addWidget(self.create_console())
+        central_layout.addWidget(self.progress_bar)
+
     def create_menu(self):
         menubar = self.menuBar()
 
@@ -718,12 +948,16 @@ class MyWindow(QMainWindow):
 
         # File functions
         new_action = QAction('New', self)
+        new_action.setShortcut('Ctrl+N')
         new_action.triggered.connect(self.functions.reset_fields)
         open_action = QAction('Open config', self)
+        open_action.setShortcut('Ctrl+O')
         open_action.triggered.connect(self.file_handler.open_config)
         save_action = QAction('Save config', self)
+        save_action.setShortcut('Ctrl+S')
         save_action.triggered.connect(self.file_handler.save_config)
         exit_action = QAction('Exit', self)
+        exit_action.setShortcut('Alt+F4')
         exit_action.triggered.connect(self.close)
 
         # File add functions
@@ -738,6 +972,7 @@ class MyWindow(QMainWindow):
 
         # Help functions
         about_action = QAction('About', self)
+        about_action.setShortcut('F1')
         about_action.triggered.connect(self.show_about)
 
         # Help add functions
@@ -746,32 +981,197 @@ class MyWindow(QMainWindow):
     def create_tabs(self):
         # Create dump text tab
         dump_text_tab = QWidget()
+        #dump_text_tab.setMaximumHeight(481)
         dump_text_layout = QVBoxLayout()
-        
-        # Extract Fuctions
-        dump_text_layout.addWidget(self.create_select_file_groupbox())
-        dump_text_layout.addWidget(self.create_set_pointers_groupbox())
-        dump_text_layout.addWidget(self.create_set_offsets_groupbox())
-        dump_text_layout.addWidget(self.create_advanced_options_groupbox())       
-        dump_text_layout.addWidget(self.create_console())
+        dump_text_layout.addWidget(self.create_select_file_groupbox(), alignment=Qt.AlignTop)
+        dump_text_layout.addWidget(self.create_set_pointers_groupbox(), alignment=Qt.AlignTop)
+        dump_text_layout.addWidget(self.create_set_offsets_groupbox(), alignment=Qt.AlignTop)
+        dump_text_layout.addWidget(self.create_advanced_options_groupbox(), alignment=Qt.AlignTop)       
         dump_text_layout.addLayout(self.create_actions_buttons())
-        dump_text_tab .setLayout(dump_text_layout)
+        dump_text_tab.setLayout(dump_text_layout)
 
-        # Create miscellaneous tab
-        miscellaneous_tab = QWidget()
-        miscellaneous_layout = QVBoxLayout()
+        # Create compress script tools
+        compression_tools_tab = QWidget()
+        compression_tools_layout = QVBoxLayout()
+        compression_tools_layout.addWidget(self.create_compression_tools_groupbox(), alignment=Qt.AlignTop)
+        compression_tools_tab.setLayout(compression_tools_layout)
         
-        miscellaneous_tab.setLayout(miscellaneous_layout)
+        # Create analysis tool tab 
+        analysis_tool_tab = QWidget()
+        analysis_tool_layout = QVBoxLayout()
+        analysis_tool_layout.addWidget(self.create_analysis_tool_options_groupbox(), alignment=Qt.AlignTop)
+        analysis_tool_layout.addWidget(self.create_analysis_tool_output_groupbox(), alignment=Qt.AlignTop)
+        analysis_tool_tab.setLayout(analysis_tool_layout)
 
         # Add to QTabWidget
-        self.tabs.addTab(dump_text_tab, "Uncompressed Text")
-        #self.tabs.addTab(miscellaneous_tab, "Compressed Text")
+        #self.tabs.setMaximumHeight(510)
+        self.tabs.addTab(dump_text_tab, "Dump Text")
+        self.tabs.addTab(compression_tools_tab, "Compress Script Tools")
+        self.tabs.addTab(analysis_tool_tab, "Script Analysis Tools")
+        
+    def show_size(self):
+        width = self.width()
+        height = self.height()
+        QMessageBox.information(self, "Window size", f"Width: {width} px\nHeight: {height} px")
+        
+    def create_analysis_tool_options_groupbox(self):
+        group_box = QGroupBox()
+        layout = QVBoxLayout()
+
+        # Dictionary Option
+        dictionary_layout = QHBoxLayout()
+        self.compare_to_dictionary_label = QLabel("Compare Dictionary:", self)
+        self.compare_to_dictionary_list = QComboBox()
+        self.compare_to_dictionary_list.addItem("Only Uppercase", 0)
+        self.compare_to_dictionary_list.addItem("Only Lowercase", 1)
+        self.compare_to_dictionary_list.addItem("Both", 2)
+        self.compare_to_dictionary_list.addItem("Both + Special", 3)
+        self.compare_to_dictionary_list.addItem("Romanji + Jap", 4)
+        dictionary_layout.addWidget(self.compare_to_dictionary_label)
+        dictionary_layout.addWidget(self.compare_to_dictionary_list)
+        dictionary_layout.addStretch()
+
+        # Checkbox
+        self.search_combination_checkbox = QCheckBox("Optimize DTE/MTE.", self)
+        self.search_combination_checkbox.stateChanged.connect(self.functions.toggle_seach_combinations)
+
+        # Max Frecuencies Option
+        max_frecuencies_layout = QHBoxLayout()
+        max_frecuencies_layout_help = "Maximum number of combinations to search for.\nInterval(10-129)."
+        self.max_frecuencies_label = QLabel("Max frecuencies:", self)
+        self.max_frecuencies_label.setToolTip(max_frecuencies_layout_help)
+        self.max_frecuencies_input = QLineEdit(self)
+        self.max_frecuencies_input.setDisabled(True)
+        self.max_frecuencies_input.setFixedWidth(30)
+        self.max_frecuencies_input.setText("99")
+        self.max_frecuencies_input.setValidator(QRegExpValidator(QRegExp(r'(1[0-2][0-9]|10[0-9]|[1-9][0-9]|10|11[0-8]|12[0-8])'), self))
+        self.max_frecuencies_input.setToolTip(max_frecuencies_layout_help)
+
+        max_frecuencies_layout.addWidget(self.max_frecuencies_label)
+        max_frecuencies_layout.addWidget(self.max_frecuencies_input)
+
+        # Max Char Lenght Option
+        max_char_lenght_layout = QHBoxLayout()
+        max_char_lenght_layout_help = "Maximum length of compressions to search for.\nInterval(2-15)."
+        self.max_char_lenght_label = QLabel("Max Combinations Lenght:", self)
+        self.max_char_lenght_label.setToolTip(max_char_lenght_layout_help)
+        self.max_char_lenght_input = QLineEdit(self)
+        self.max_char_lenght_input.setDisabled(True)
+        self.max_char_lenght_input.setFixedWidth(30)
+        self.max_char_lenght_input.setText("2")
+        self.max_char_lenght_input.setValidator(QRegExpValidator(QRegExp(r'([2-9]|1[0-5])'), self))
+        self.max_char_lenght_input.setToolTip(max_char_lenght_layout_help)
+
+        max_frecuencies_layout.addWidget(self.max_char_lenght_label)
+        max_frecuencies_layout.addWidget(self.max_char_lenght_input)
+        max_frecuencies_layout.addStretch()
+        
+        # Optimize button
+        center_button_layout = QHBoxLayout()
+        
+        self.optimize_button = QPushButton("Search", self)
+        self.optimize_button.setFixedWidth(100)
+        self.optimize_button.clicked.connect(self.functions.process_script_analysis)
+
+        center_button_layout.addStretch()
+        center_button_layout.addWidget(self.optimize_button)
+        center_button_layout.addStretch()
+        
+        # Layout Config
+        layout.addLayout(dictionary_layout)
+        layout.addWidget(self.search_combination_checkbox)
+        layout.addLayout(max_frecuencies_layout) 
+        layout.addLayout(center_button_layout) 
+        
+        group_box.setLayout(layout)
+        return group_box
+    
+    def create_analysis_tool_output_groupbox(self):
+        group_box = QGroupBox()
+        layout = QVBoxLayout()
+
+        # Characters counter
+        self.characters_counter_label = QLabel("Characters Counter:", self)
+        self.characters_counter_output = QPlainTextEdit(self)
+        self.characters_counter_output.setReadOnly(True)
+        self.characters_counter_output.setMinimumHeight(80)
+
+        # Unused characters
+        self.unused_characters_label = QLabel("Unused Characters:", self)
+        self.unused_characters_output = QPlainTextEdit(self)
+        self.unused_characters_output.setReadOnly(True)
+        self.unused_characters_output.setMinimumHeight(80)
+
+        # Best combinations
+        self.best_combinations_label = QLabel("DTE/MTE Optimizer:", self)
+        self.best_combinations_output = QPlainTextEdit(self)
+        self.best_combinations_output.setReadOnly(True)
+        self.best_combinations_output.setMinimumHeight(80)
+
+        # Layout Order
+       
+        layout.addWidget(self.characters_counter_label)
+        layout.addWidget(self.characters_counter_output)
+
+        layout.addWidget(self.unused_characters_label)
+        layout.addWidget(self.unused_characters_output)
+
+        layout.addWidget(self.best_combinations_label)
+        layout.addWidget(self.best_combinations_output)
+
+        group_box.setLayout(layout)
+        return group_box
+
+    def create_compression_tools_groupbox(self):
+        group_box = QGroupBox()
+        group_box.setMaximumHeight(140)
+        layout = QVBoxLayout()
+
+        # Use compression/decompression tools
+        self.use_compression_algorithm_method_checkbox = QCheckBox("Use compression algorithm method (experimental).", self)
+        self.use_compression_algorithm_method_checkbox.stateChanged.connect(self.functions.toggle_use_compression_method_options)
+        layout.addWidget(self.use_compression_algorithm_method_checkbox)
+
+        # Compression Method
+        method_layout = QHBoxLayout()
+        method_label = QLabel("Compression Algorithm:")
+        self.compression_method_list = QComboBox()
+        self.compression_method_list.setDisabled(True)
+        self.compression_method_list.setFixedWidth(120)
+        self.compression_method_list.addItem("Lempel-Ziv", 0)
+        #self.compression_method_list.addItem("Golomb-Rice", 1)
+        method_layout.addWidget(method_label)
+        method_layout.addWidget(self.compression_method_list)
+        method_layout.addStretch()
+        layout.addLayout(method_layout)
+
+        # Variant
+        type_layout = QHBoxLayout()
+        type_label = QLabel("Variant:")
+        self.compression_type_list = QComboBox()
+        self.compression_type_list.setDisabled(True)
+        self.compression_type_list.setFixedWidth(120)
+        type_layout.addWidget(type_label)
+        type_layout.addWidget(self.compression_type_list)
+        type_layout.addStretch()
+        layout.addLayout(type_layout)
+
+        # Connect with function
+        self.compression_method_list.currentIndexChanged.connect(
+            lambda index: Functions.update_compression_types(index, self.compression_type_list)
+        )
+        # Update Variant
+        Functions.update_compression_types(
+            self.compression_method_list.currentIndex(), self.compression_type_list
+        )
+        group_box.setLayout(layout)
+        return group_box
 
     def create_select_file_groupbox(self):
         group_box = QGroupBox("Select Files", self)
         group_box.setMinimumHeight(120)
         group_box.setMaximumHeight(120)
-        group_box.setMaximumWidth(430)
+        group_box.setMinimumWidth(400)
         layout = QVBoxLayout()
 
         # Open ROM
@@ -826,7 +1226,7 @@ class MyWindow(QMainWindow):
         group_box = QGroupBox("Set Pointers", self)
         group_box.setMinimumHeight(100)
         group_box.setMaximumHeight(100)
-        group_box.setMaximumWidth(430)
+        group_box.setMinimumWidth(400)
         layout = QVBoxLayout()
 
         # Pointers Length
@@ -837,23 +1237,24 @@ class MyWindow(QMainWindow):
         self.radio_4_bytes = QRadioButton("4 bytes", self)
         self.radio_2_bytes.setChecked(True)
         pointers_length_layout.addWidget(self.pointers_length_label)
+        #pointers_length_layout.addStretch()
         pointers_length_layout.addWidget(self.radio_2_bytes)
         pointers_length_layout.addWidget(self.radio_3_bytes)
         pointers_length_layout.addWidget(self.radio_4_bytes)
         layout.addLayout(pointers_length_layout)
 
         # Endianness
-        endianness_layout = QGridLayout()
+        endianness_layout = QHBoxLayout()
         self.endianness_label = QLabel("Endianness:", self)
-        self.endianness_spacer_label = QLabel("", self)
-        self.endianness_spacer_label.setFixedWidth(70)
         self.endianness_list = QComboBox(self)
+        self.endianness_list.setMinimumWidth(160)
         self.endianness_list.addItem("Little Endian", 0)
         self.endianness_list.addItem("Big Endian", 1)
         self.endianness_list.setCurrentIndex(0)
-        endianness_layout.addWidget(self.endianness_label, 0, 0)
-        endianness_layout.addWidget(self.endianness_list, 0, 1)
-        endianness_layout.addWidget(self.endianness_spacer_label, 0, 2)
+        endianness_layout.addWidget(self.endianness_label)
+        endianness_layout.addStretch()
+        endianness_layout.addWidget(self.endianness_list)
+        endianness_layout.addStretch()
         layout.addLayout(endianness_layout)
 
         # Add all to group box
@@ -865,7 +1266,7 @@ class MyWindow(QMainWindow):
         group_box = QGroupBox("Set Offsets", self)
         group_box.setMinimumHeight(130)
         group_box.setMaximumHeight(130)
-        group_box.setMaximumWidth(430)
+        group_box.setMinimumWidth(400)
         group_layout = QGridLayout()
         group_layout.setSpacing(0)
 
@@ -921,7 +1322,7 @@ class MyWindow(QMainWindow):
         
         # End Line Split Code     
         self.end_line_label = QLabel("End Line:")
-        self.end_line_label.setToolTip('Code used to split lines.\nTip: Use multiple separated by ","')
+        self.end_line_label.setToolTip('Code used to split pointers.\nTip: Use multiple separated by ","')
         self.end_line_input = QLineEdit(self)
         self.end_line_input.setPlaceholderText("00,00,00")
         self.end_line_input.setFixedWidth(65)
@@ -958,7 +1359,8 @@ class MyWindow(QMainWindow):
 
     def create_advanced_options_groupbox(self):
         group_box = QGroupBox(self)
-        group_box.setMaximumWidth(430)
+        #group_box.setFixedHeight(50)
+        group_box.setMinimumWidth(400)
         layout = QVBoxLayout()
 
         # Create advance options button
@@ -973,42 +1375,36 @@ class MyWindow(QMainWindow):
         advanced_layout = QVBoxLayout()
         advanced_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 1.- Not comment lines 
-        self.not_comment_lines_checkbox = QCheckBox("Not duplicate line as a comment.", self)
-        self.not_comment_lines_checkbox.setToolTip("Use this if you don't want a duplicate line as a comment.\n"'Note: comments will start with ";".') 
-        advanced_layout.addWidget(self.not_comment_lines_checkbox)
-
-        # 2.- Use custom brackets for raw hex codes.
-        self.use_custom_brackets_for_hex_codes_checkbox = QCheckBox("Use custom brackets for raw hex codes.", self)
-        self.use_custom_brackets_for_hex_codes_checkbox.setToolTip("Unassigned characters in the table will be represented between them.")
-        self.use_custom_brackets_for_hex_codes_checkbox.toggled.connect(self.functions.toggle_custom_brackets)
+        # Use custom brackets for raw hex codes.
+        self.use_custom_brackets_for_hex_codes_label = QLabel(" ●  Brackets for raw bytes:", self)
+        self.use_custom_brackets_for_hex_codes_label.setToolTip("Unassigned characters in the table will be represented between them.")
         self.use_custom_brackets_for_hex_codes_list = QComboBox(self)
         self.use_custom_brackets_for_hex_codes_list.setFixedWidth(50)
-        self.use_custom_brackets_for_hex_codes_list.setDisabled(True)
         self.use_custom_brackets_for_hex_codes_list.addItem("~ ~", 0)
         self.use_custom_brackets_for_hex_codes_list.addItem("[ ]", 1)
         self.use_custom_brackets_for_hex_codes_list.addItem("{ }", 2)
         self.use_custom_brackets_for_hex_codes_list.addItem("< >", 3)
         self.use_custom_brackets_for_hex_codes_list.setCurrentIndex(0)
-        self.use_custom_brackets_for_hex_codes_spacer = QLabel("", self)
-        self.use_custom_brackets_for_hex_codes_spacer.setFixedWidth(80)
         
         use_custom_brackets = QHBoxLayout()
         use_custom_brackets.setContentsMargins(0, 0, 0, 0)
-        use_custom_brackets.setSpacing(0)
-        use_custom_brackets.addWidget(self.use_custom_brackets_for_hex_codes_checkbox)
+        use_custom_brackets.addWidget(self.use_custom_brackets_for_hex_codes_label)
         use_custom_brackets.addWidget(self.use_custom_brackets_for_hex_codes_list)
-        use_custom_brackets.addWidget(self.use_custom_brackets_for_hex_codes_spacer)                                             
+        use_custom_brackets.addStretch()                                          
         
         use_custom_brackets_widget = QWidget(self)
         use_custom_brackets_widget.setLayout(use_custom_brackets)
 
         advanced_layout.addWidget(use_custom_brackets_widget)
 
+        # Not comment lines 
+        self.not_comment_lines_checkbox = QCheckBox("Not duplicate line as a comment.", self)
+        self.not_comment_lines_checkbox.setToolTip("Use this if you don't want a duplicate line as a comment.\n"'Note: comments will start with ";".') 
+        advanced_layout.addWidget(self.not_comment_lines_checkbox)
 
-        # 3.- Fill free space with byte
+        # Fill free space with byte
 
-        self.fill_free_space_byte_checkbox = QCheckBox("Fill free space when inserting with the next byte.", self)
+        self.fill_free_space_byte_checkbox = QCheckBox("Fill free space when inserting with byte:", self)
         self.fill_free_space_byte_checkbox.setToolTip("Use this if you want to fill the free space left when you insert the script with a custom byte.\nOnly when inserted.")
         self.fill_free_space_byte_checkbox.stateChanged.connect(self.functions.toggle_fill_free_space)
         self.fill_free_space_byte_input = QLineEdit(self)
@@ -1018,8 +1414,6 @@ class MyWindow(QMainWindow):
         self.fill_free_space_byte_input.setDisabled(True)
         self.fill_free_space_byte_input.setFixedWidth(25)
         self.functions.set_uppercase_formatting(self.fill_free_space_byte_input)
-        self.fill_free_space_byte_spacer = QLabel ("", self)
-        self.fill_free_space_byte_spacer.setFixedWidth(50)
 
         fill_free_space = QHBoxLayout()
         fill_free_space.setSpacing(0)
@@ -1027,7 +1421,7 @@ class MyWindow(QMainWindow):
         fill_free_space.addWidget(self.fill_free_space_byte_checkbox)
         fill_free_space.addWidget(self.functions.create_prefix_label())
         fill_free_space.addWidget(self.fill_free_space_byte_input)
-        fill_free_space.addWidget(self.fill_free_space_byte_spacer)
+        fill_free_space.addStretch()
 
         fill_free_space_widget = QWidget(self)
         fill_free_space_widget.setLayout(fill_free_space)
@@ -1035,14 +1429,11 @@ class MyWindow(QMainWindow):
         advanced_layout.addWidget(fill_free_space_widget)
         
         
-        # 4.- Use split pointers extraction (2 bytes only)
+        # Use split pointers extraction (2 bytes only)
         self.use_split_pointers_checkbox = QCheckBox("Use split pointers method (2 bytes only).", self)
         self.use_split_pointers_checkbox.setToolTip("Use it if the pointer table is divided into 2 parts.\nLSB: Lest significant bytes.\nMSB: Most significant bytes.\nSize: Numbers of pointers <hex>.")
         self.use_split_pointers_checkbox.stateChanged.connect(self.functions.toggle_split_pointers)
         advanced_layout.addWidget(self.use_split_pointers_checkbox)
-
-        self.spacer_label = QLabel("", self)
-        self.spacer_label.setFixedWidth(10)
 
         self.lsb_offset_label = QLabel("LSB Offset:", self)
         self.lsb_offset_input = QLineEdit(self)
@@ -1051,49 +1442,44 @@ class MyWindow(QMainWindow):
         self.lsb_offset_input.setValidator(QRegExpValidator(QRegExp("[0-9A-Fa-f]{1,8}")))
         self.functions.set_uppercase_formatting(self.lsb_offset_input)
 
-        self.msb_offset_label = QLabel("MSB Offset:", self)
+        self.msb_offset_label = QLabel("  MSB Offset:", self)
         self.msb_offset_input = QLineEdit(self)
         self.msb_offset_input.setPlaceholderText("000000")
         self.msb_offset_input.setFixedWidth(60)
         self.msb_offset_input.setValidator(QRegExpValidator(QRegExp("[0-9A-Fa-f]{1,8}")))
         self.functions.set_uppercase_formatting(self.msb_offset_input)
 
-        self.size_label = QLabel("Size:", self)
+        self.size_label = QLabel("  Size:", self)
         self.size_input = QLineEdit(self)
         self.size_input.setPlaceholderText("0000")
         self.size_input.setFixedWidth(40)
         self.size_input.setValidator(QRegExpValidator(QRegExp("[0-9A-Fa-f]{1,8}")))
         self.functions.set_uppercase_formatting(self.size_input)
 
-        grid_layout = QGridLayout()
-        grid_layout.setSpacing(0)
+        split_pointers_layout = QHBoxLayout()
+        split_pointers_layout.setSpacing(0)
 
-        grid_layout.addWidget(self.lsb_offset_label, 0, 0)
-        grid_layout.addWidget(self.functions.create_prefix_label(), 0, 1)
-        grid_layout.addWidget(self.lsb_offset_input, 0, 2)
-        grid_layout.addWidget(self.spacer_label, 0,3)
+        split_pointers_layout.addWidget(self.lsb_offset_label)
+        split_pointers_layout.addWidget(self.functions.create_prefix_label())
+        split_pointers_layout.addWidget(self.lsb_offset_input)
+        #split_pointers_layout.addStretch()
 
-        grid_layout.addWidget(self.msb_offset_label, 0, 4)
-        grid_layout.addWidget(self.functions.create_prefix_label(), 0, 5)
-        grid_layout.addWidget(self.msb_offset_input, 0, 6)
-        grid_layout.addWidget(self.spacer_label, 0, 7)
+        split_pointers_layout.addWidget(self.msb_offset_label)
+        split_pointers_layout.addWidget(self.functions.create_prefix_label())
+        split_pointers_layout.addWidget(self.msb_offset_input)
+        #split_pointers_layout.addStretch()
 
-        grid_layout.addWidget(self.size_label, 0, 8)
-        grid_layout.addWidget(self.functions.create_prefix_label(), 0, 9)
-        grid_layout.addWidget(self.size_input, 0, 10)
+        split_pointers_layout.addWidget(self.size_label)
+        split_pointers_layout.addWidget(self.functions.create_prefix_label())
+        split_pointers_layout.addWidget(self.size_input)
+        split_pointers_layout.addStretch()
 
-        self.functions.disable_layout_widgets(grid_layout)
-        advanced_layout.addLayout(grid_layout)
-        
-        # 5.- Ignore end line codes before decoding box.
-        self.ignore_end_line_checkbox = QCheckBox("At extract ignore end line code until some character are decoded.", self)
-        self.ignore_end_line_checkbox.setToolTip("Use this if the game has a control code at the start equal to the end of the line.\nOnly when extracted.")
-        self.ignore_end_line_checkbox.stateChanged.connect(self.functions.toggle_ignore_end_line_before_decoding)
-        advanced_layout.addWidget(self.ignore_end_line_checkbox)
+        self.functions.disable_layout_widgets(split_pointers_layout)
+        advanced_layout.addLayout(split_pointers_layout)
 
-        # 6.- Not use end line
-        self.not_use_end_line_checkbox = QCheckBox("Not use end line code for split lines (Use pointers lenght).", self)
-        self.not_use_end_line_checkbox.setToolTip("Use this if the game does not support a fixed line ending code,\nAt 'extract' lines will be split based on the difference between pointers.\nAt 'Insert' pointer will be calculated based in every line lenght in the script.")
+        # Not use end line
+        self.not_use_end_line_checkbox = QCheckBox("Not use end line code for split lines (use pointers length).", self)
+        self.not_use_end_line_checkbox.setToolTip("Use this if the game does not support a fixed line ending code,\nAt 'extract' lines will be split based on the difference between pointers.\nAt 'Insert' pointer will be calculated based in every line length in the script.")
         self.not_use_end_line_checkbox.stateChanged.connect(self.functions.toggle_not_use_end_line)
         advanced_layout.addWidget(self.not_use_end_line_checkbox)
 
@@ -1114,15 +1500,8 @@ class MyWindow(QMainWindow):
 
         self.show_console = QTextEdit(self)
         self.show_console.setMinimumHeight(80)
-        self.show_console.setMaximumHeight(80)
-        self.show_console.setMaximumWidth(430)
+        self.show_console.setMinimumWidth(400)
         self.show_console.setReadOnly(True)
-##        self.show_console.setStyleSheet("""
-##            background-color: black;
-##            color: white;
-##            font-family: Courier New, monospace;
-##            font-size: 12px;
-##        """)
         
         layout.addWidget(self.show_console)
         console_widget.setLayout(layout)
@@ -1157,31 +1536,36 @@ class MyWindow(QMainWindow):
         layout = QVBoxLayout()
 
         about_version = (
-            "HexString v1.3.0.<br>"
-            "Created by koda.<br><br>"
+            f"<div align='right'><span style='color:gray;'>Build: {version}_{date}{hour}</span></div><br>"
+            f"{app_name} v{version}.<br>"
+            f"Created by {author}.<br><br>"
             "Home: "
-            "<a href='https://github.com/KodingBTW/hexstring'>https://github.com/KodingBTW/hexstring</a><br><br>"
+            f"<a href='{url}'>{url}</a>"
         )
-
         about_text = QLabel()
         about_text.setTextFormat(Qt.RichText)
         about_text.setText(about_version)
+        about_text.setFixedHeight(100)
         about_text.setOpenExternalLinks(True)
         about_text.setAlignment(Qt.AlignCenter)
 
         license_groupbox = QGroupBox("GNU General Public License")
-        #license_groupbox.setStyleSheet("background-color: #e0e0e0; border-radius: 5px; padding: 10px;")
+        license_groupbox.setStyleSheet("""
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 10px;
+                font-weight: bold;
+            }
+        """)
         license_layout = QVBoxLayout()
     
         license_text = QTextEdit()
+        license_text.setMinimumHeight(120)
         license_text.setReadOnly(True)
         license_text.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        license_text.setText(
-        """<p>This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or at your option any later version.</p>
-        <p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.</p>
-        <p>You should have received a copy of the GNU General Public License along with this program. If not, see <a href='https://www.gnu.org/licenses/'>https://www.gnu.org/licenses/</a>.</p>"""
-        )
-      
+        license_text.setText(f"{license}")
+        
         license_layout.addWidget(license_text)
         license_groupbox.setLayout(license_layout)
         
@@ -1197,23 +1581,32 @@ class MyWindow(QMainWindow):
     
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        cli = CLI()  
-        cli.parse_arguments()
-        cli.run()
+        print("Use console.exe to use cli commands.")
+        exit(1)
+        
     else:
-        app = QApplication(sys.argv)
-        basedir = os.path.dirname(__file__)
-        app.setWindowIcon(QtGui.QIcon(os.path.join(basedir, 'resources', 'hand.ico')))
-        process = 'HexString130'
+        # Dependencies
+        basedir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+        icon_path = os.path.join(basedir, resources_path, icon_file)
+        if not os.path.exists(icon_path):
+            app = QApplication(sys.argv)
+            error_window = QWidget()
+            functions = Functions(error_window)
+            functions.show_error_dialog(f"File not found: {icon_path}")
+            sys.exit(1)
+
+        app = QApplication(sys.argv)   
+        app.setWindowIcon(QtGui.QIcon(icon_path))
+        process = app_name + version
         windll.shell32.SetCurrentProcessExplicitAppUserModelID(process)
         hexstring = MyWindow()
         hexstring.show()
         #debbug
-##        sys._excepthook = sys.excepthook 
-##        def exception_hook(exctype, value, traceback):
-##            print(exctype, value, traceback)
-##            sys._excepthook(exctype, value, traceback) 
-##            sys.exit(1) 
-##        sys.excepthook = exception_hook
+        sys._excepthook = sys.excepthook 
+        def exception_hook(exctype, value, traceback):
+            print(exctype, value, traceback)
+            sys._excepthook(exctype, value, traceback) 
+            sys.exit(1) 
+        sys.excepthook = exception_hook
 
         sys.exit(app.exec_())

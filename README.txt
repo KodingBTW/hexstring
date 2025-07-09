@@ -1,195 +1,223 @@
 ------------------------------------------------------
 
-Nombre:			HexString
-Autor:			koda
-Latest Version:  	1.3.0
-URL:			https://traduccioneskoda.blogspot.com/
-				https://github.com/KodingBTW/hexstring
-Last Update:	28/04/2024
+NOMBRE:			HEXSTRING
+AUTOR:			KODA
+LATEST VERSION:  	1.4.0
+URL:			HTTPS://TRADUCCIONESKODA.BLOGSPOT.COM/
+				HTTPS://GITHUB.COM/KODINGBTW/HEXSTRING
+LAST UPDATE:	08/07/2024
 
 ------------------------------------------------------
-1 - WHAT'S THIS?
+1 - WHAT'S THIS?
 ------------------------------------------------------
 
-HexString allows you to dump the text of a ROM, then 
-reinsert it in order to modify and translate it into 
-other languages. By providing the correct parameters, 
-this program will also modify the pointer table. This 
-automates the entire process, and you only need to 
-focus on translating.
+HEXSTRING ALLOWS YOU TO DUMP THE TEXT OF A ROM, THEN 
+REINSERT IT IN ORDER TO MODIFY AND TRANSLATE IT INTO 
+OTHER LANGUAGES. BY PROVIDING THE CORRECT PARAMETERS, 
+THIS PROGRAM WILL ALSO MODIFY THE POINTER TABLE. THIS 
+AUTOMATES THE ENTIRE PROCESS, AND YOU ONLY NEED TO 
+FOCUS ON TRANSLATING.
 
 ------------------------------------------------------
-2 - WHAT'S NEW
+2 - WHAT'S NEW
 ------------------------------------------------------
+V1.4.0
+
+DELETED:
+- IGNORE END LINE CODE UNTIL SOME CHARACTER ARE DECODED
+(REPLACED FOR NOT USE END LINE CODE OPTION).
+
+FIXED:
+- FIXED DTE/MTE CASE WHEN RAW BYTES ARE SPLITTED AND NOT
+CORRECTLY USED TO CREATE A COMBINATION.
+- JAPONESE AND UTF-8 CHARACTERS NOW CORRECTLY SUPPORTED.
+- CORRECTED SOME TYPOS.
+
+IMROVEMENTS:
+- IGNORED LINES IN SCRIPT STARTING WITH "/".
+- CODES WITH SAME BRACKETS FOR RAW BYTES NOW CAN BE USED.
+- IMPROVED DTE/MTE SEARCH AND TIME.
+- IMPROVED UI.
+- IMPROVED CODE.
+
+NEW FEATURES:
+- ADDED KEY SHORTCUTS.
+- ADDED STATUS BAR.
+- TBL MULIBYTE SUPPORT.
+- SCRIPT ANALYSIS TOOLS ADDED (NOW YOU CAN SEARCH
+CHARACTERS USED AND NOT USED IN THE SCRIPT, SEARCH BETTER
+DTE/MTE COMBINATIONS).
+- EXPERIMENTAL COMPRESSION TOOLS ADDED (LZ77-LZSS-LZW).
+
 V1.3.0
-- Graphical interface added
+- GRAPHICAL INTERFACE ADDED
 
-- Maintained legacy CLI (Watch cli_commands.txt)
+- MAINTAINED LEGACY CLI (WATCH CLI_COMMANDS.TXT)
 
-- Tons of new options added
+- TONS OF NEW OPTIONS ADDED
 
-- Support 2 bytes, 3 bytes and 4 bytes pointers for
-little and big endian.
+- SUPPORT 2 BYTES, 3 BYTES AND 4 BYTES POINTERS FOR
+LITTLE AND BIG ENDIAN.
 
-- Now you can save and load .json configs
+- NOW YOU CAN SAVE AND LOAD .JSON CONFIGS
 
-- You can select whether you want comments on lines.
+- YOU CAN SELECT WHETHER YOU WANT COMMENTS ON LINES.
 
-- Added the use of custom brackets for raw hexadecimals.
+- ADDED THE USE OF CUSTOM BRACKETS FOR RAW HEXADECIMALS.
 
-- Option to fill the free space with a specific byte.
-- Support for split pointers (LSB/MSB).
+- OPTION TO FILL THE FREE SPACE WITH A SPECIFIC BYTE.
+- SUPPORT FOR SPLIT POINTERS (LSB/MSB).
 
-- Smart function that allows you to ignore any control
-code at the beginning of a line that is equal to the
-end-of-line code.
+- SMART FUNCTION THAT ALLOWS YOU TO IGNORE ANY CONTROL
+CODE AT THE BEGINNING OF A LINE THAT IS EQUAL TO THE
+END-OF-LINE CODE.
 
-- Function that ignores the use of an end-of-line code
-to count pointers. (It will split based on the length of
-the pointer; to insert each line in the file, it will be
-a pointer.)
+- FUNCTION THAT IGNORES THE USE OF AN END-OF-LINE CODE
+TO COUNT POINTERS. (IT WILL SPLIT BASED ON THE LENGTH OF
+THE POINTER; TO INSERT EACH LINE IN THE FILE, IT WILL BE
+A POINTER.)
 
-- Added About tab
+- ADDED ABOUT TAB
 
-- Added Reset fields tab
+- ADDED RESET FIELDS TAB
 
-- Optimized code
+- OPTIMIZED CODE
 
-V1.2
-- Now empty line before linebreaker are corrected
-readed.
+V1.2.0
+- NOW EMPTY LINE BEFORE LINEBREAKER ARE CORRECTED
+READED.
 
-- You can replace linbreaker for text end offset
-and the program will split text with the pointer
-table.
+- YOU CAN REPLACE LINBREAKER FOR TEXT END OFFSET
+AND THE PROGRAM WILL SPLIT TEXT WITH THE POINTER
+TABLE.
 
-- 4 bytes pointer are correctly interpreted.
+- 4 BYTES POINTER ARE CORRECTLY INTERPRETED.
 
 V1.1.0
 
-Bugs Fixed:
-- If you split the text when editing, it was 
-misinterpreted by the encoder as a new pointer. 
-(Thanks to Wave).
+FIXED:
+- IF YOU SPLIT THE TEXT WHEN EDITING, IT WAS 
+MISINTERPRETED BY THE ENCODER AS A NEW POINTER. 
+(THANKS TO WAVE).
 
-- The text block counter function is now smarter. 
-If two pointers point to the same text it will be 
-counted only once.
+- THE TEXT BLOCK COUNTER FUNCTION IS NOW SMARTER. 
+IF TWO POINTERS POINT TO THE SAME TEXT IT WILL BE 
+COUNTED ONLY ONCE.
 
-New features:
-- Added text comments, use ";" at begining of a new 
-line. (it still can be used at character)
+NEW FEATURES:
+- ADDED TEXT COMMENTS, USE ";" AT BEGINING OF A NEW 
+LINE. (IT STILL CAN BE USED AT CHARACTER)
 
-- line with @ or | will be ignore too
+- LINE WITH @ OR | WILL BE IGNORE TOO
 
-- Now more exceptions are handled, and an error 
-text will be displayed giving more information.
+- NOW MORE EXCEPTIONS ARE HANDLED, AND AN ERROR 
+TEXT WILL BE DISPLAYED GIVING MORE INFORMATION.
 
-- Characters not found in the .tbl file will now be 
-printed in the following ~hex~ format. (The "~" symbol
-is reserved, and will be ignored if used in the 
-tbl).
+- CHARACTERS NOT FOUND IN THE .TBL FILE WILL NOW BE 
+PRINTED IN THE FOLLOWING ~HEX~ FORMAT. (THE "~" SYMBOL
+IS RESERVED, AND WILL BE IGNORED IF USED IN THE 
+TBL).
 
--In the same way when encoding, if ~hex~ is found
-it will be encoded with its corresponding hex form. 
-If any character in the text is not assigned to the 
-dictionary, it will be copied into its ASCCI format.
+-IN THE SAME WAY WHEN ENCODING, IF ~HEX~ IS FOUND
+IT WILL BE ENCODED WITH ITS CORRESPONDING HEX FORM. 
+IF ANY CHARACTER IN THE TEXT IS NOT ASSIGNED TO THE 
+DICTIONARY, IT WILL BE COPIED INTO ITS ASCCI FORMAT.
 
-- Added support for pointers of other formats and 
-lengths.
-	2bytes little endian
-	2bytes big endian
-	2bytes splitted (lsb-msb)
-	3bytes (gba format)
-	4bytes (mega drive - big endian)
+- ADDED SUPPORT FOR POINTERS OF OTHER FORMATS AND 
+LENGTHS.
+	2BYTES LITTLE ENDIAN
+	2BYTES BIG ENDIAN
+	2BYTES SPLITTED (LSB-MSB)
+	3BYTES (GBA FORMAT)
+	4BYTES (MEGA DRIVE - BIG ENDIAN)
 
-- Now when decoding the text, a comment will be 
-automatically created that contains: the address of 
-the line, a copy of the text, character length.
+- NOW WHEN DECODING THE TEXT, A COMMENT WILL BE 
+AUTOMATICALLY CREATED THAT CONTAINS: THE ADDRESS OF 
+THE LINE, A COPY OF THE TEXT, CHARACTER LENGTH.
 
-- Added previous pointer copy functionality, just 
-deletes the line and adds the "&" character to the 
-start of the line, then add his line breaker. The
-pointer will be the same as the previous one, very 
-useful if several pointers point to the same line.
+- ADDED PREVIOUS POINTER COPY FUNCTIONALITY, JUST 
+DELETES THE LINE AND ADDS THE "&" CHARACTER TO THE 
+START OF THE LINE, THEN ADD HIS LINE BREAKER. THE
+POINTER WILL BE THE SAME AS THE PREVIOUS ONE, VERY 
+USEFUL IF SEVERAL POINTERS POINT TO THE SAME LINE.
 
 V1.0.0
-- Decoding ROM Data.
-- Encoding binary files.
-- Automatic updates pointers table (Only 2 bytes).
-- Support .tbl dictionaries.
-- Support for DTE/MTE enconding/decoding.
-- Support Latin1 characters.
+- DECODING ROM DATA.
+- ENCODING BINARY FILES.
+- AUTOMATIC UPDATES POINTERS TABLE (ONLY 2 BYTES).
+- SUPPORT .TBL DICTIONARIES.
+- SUPPORT FOR DTE/MTE ENCONDING/DECODING.
+- SUPPORT LATIN1 CHARACTERS.
 
 ------------------------------------------------------
 3 - HOW TO USE IT?
 ------------------------------------------------------
-This program requires a certain level of romhacking 
-skill.
+THIS PROGRAM REQUIRES A CERTAIN LEVEL OF ROMHACKING 
+SKILL.
 
-Requeriments:
-- Know how to create a thingy .tbl table
-- Know how indentify pointers format
-- Know how to find pointers
-- Know how to edit sources and fonts
-- Edition with some text editor (ex: Notepad++)
-- A basic sense how a rom work.
+REQUERIMENTS:
+- KNOW HOW TO CREATE A THINGY .TBL TABLE
+- KNOW HOW INDENTIFY POINTERS FORMAT
+- KNOW HOW TO FIND POINTERS
+- KNOW HOW TO EDIT SOURCES AND FONTS
+- EDITION WITH SOME TEXT EDITOR (EX: NOTEPAD++)
+- A BASIC SENSE HOW A ROM WORK.
 
-To export script:
+TO EXPORT SCRIPT:
 
-1.- Open ROM file and tbl file
+1.- OPEN ROM FILE AND TBL FILE
 
-2.- Select pointers format (lenght and endiannes)
+2.- SELECT POINTERS FORMAT (LENGHT AND ENDIANNES)
 
-3.- Fill all space in "Set Offsets"
+3.- FILL ALL SPACE IN "SET OFFSETS"
 
-*Pointers Base: Distance beetween text offset and 
-the pointer (inverted if pointers are in little endian)
+*POINTERS BASE: DISTANCE BEETWEEN TEXT OFFSET AND 
+THE POINTER (INVERTED IF POINTERS ARE IN LITTLE ENDIAN)
 
-Ecuation
-(Text Address for the pointer - pointer inverted)
+ECUATION
+(TEXT ADDRESS FOR THE POINTER - POINTER INVERTED)
 
-Example: for Goof Troop (U).snes
+EXAMPLE: FOR GOOF TROOP (U).SNES
 
-ROMK Pointer format are 2 bytes little endian, so the
-pointer is "81 E8", so you invert to $E881, 
-the text address is "$05E881", so if you use the 
-ecuation: $5E881 - $E881 = $50000
+ROM POINTERS FORMAT ARE 2 BYTES LITTLE ENDIAN, SO THE
+POINTER IS "81 E8", SO YOU INVERT TO $E881, 
+THE TEXT ADDRESS IS "$05E881", SO IF YOU USE THE 
+ECUATION: $5E881 - $E881 = $50000
 
-*End Line: Code used to split lines by pointers. 
-It is possible to use multiple lines separated by ",". 
-If it is not clear, I recommend using the advanced option 
-"not use end lines"
+*END LINE: CODE USED TO SPLIT LINES BY POINTERS. 
+IT IS POSSIBLE TO USE MULTIPLE LINES SEPARATED BY ",". 
+IF IT IS NOT CLEAR, I RECOMMEND USING THE ADVANCED OPTION 
+"NOT USE END LINES"
 
-4.- Press "Extract script and save", a window'll appear,
-select output file and save
+4.- PRESS "EXTRACT SCRIPT AND SAVE", A WINDOW'LL APPEAR,
+SELECT OUTPUT FILE AND SAVE
 
-5.- Edit the file with you favorite text editor, I 
-recomment use  Notepad++, always use UTF-8
+5.- EDIT THE FILE WITH YOU FAVORITE TEXT EDITOR, I 
+RECOMMENT USE  NOTEPAD++, ALWAYS USE UTF-8
 
-NOTE: save config for easily insertion if you wanna
-translate in multiple sesions.
+NOTE: SAVE CONFIG FOR EASILY INSERTION IF YOU WANNA
+TRANSLATE IN MULTIPLE SESIONS.
 
-To insert Script:
+TO INSERT SCRIPT:
 
-1.- Import Script in Select Files
+1.- IMPORT SCRIPT IN SELECT FILES
 
-2.- Refill all onformation or use open config in file
-tab
+2.- REFILL ALL ONFORMATION OR USE OPEN CONFIG IN FILE
+TAB
 
-3.- Press insert Script to ROM
+3.- PRESS INSERT SCRIPT TO ROM
 
 
 ------------------------------------------------------
 4 - CLI (LEGACY)
 ------------------------------------------------------
 
-Use console.exe for cli commands if you dont want use
-interface. Check cli_commands.txt for all commands
+USE CONSOLE.EXE FOR CLI COMMANDS IF YOU DONT WANT USE
+INTERFACE. CHECK CLI_COMMANDS.TXT FOR ALL COMMANDS
 
 
 ------------------------------------------------------
 5 - TO DO:
 ------------------------------------------------------
 
-- Possibly add new algorithms for compressed text
+- MAYBE ADDED NEW COMPRESSION ALGORITHM
