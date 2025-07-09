@@ -1,4 +1,5 @@
 import argparse
+import sys
 import os
 from config import app_name, version, author, license
 from decoder import Decoder
@@ -107,7 +108,7 @@ class CLI:
                 pointers_length = 4
             else:
                 print("\nError: Invalid pointers format!")
-                exit(1)
+                sys.exit(1)
 
         # Load ROM data to RAM
         rom_data = Decoder.read_rom(rom_file, 0, os.path.getsize(rom_file))
@@ -198,7 +199,7 @@ class CLI:
             end_line = Decoder.parse_end_lines(script_end_lines)
         except AttributeError:
             print('\nERROR: No detected end lines in first line and using "No_use_end_lines=False"')
-            exit(1)
+            sys.exit(1)
 
         # Check brackets
         bracket_index = self.args.use_custom_brackets
@@ -215,7 +216,7 @@ class CLI:
         # Format Pointers
         if self.args.use_split_pointers is not None:
             original_pointers_start_offset, original_pointers_end_offset, original_pointers_size = self.args.use_split_pointers
-            new_pointers_data_lsb, new_pointers_data_msb, new_pointers_size = Encoder.calculate_pointers_2_bytes_split(cumulative_lengths, original_text_start_offset, base)
+            new_pointers_data_lsb, new_pointers_data_msb, new_pointers_size = Encoder.calculate_pointers_2_bytes_split(cumulative_lengths, original_text_start_offset, False, base)
         else:
             original_pointers_start_offset = self.args.pointers_offset
             if self.args.p == '2b':
@@ -238,15 +239,15 @@ class CLI:
                 pointers_length = 4
             else:
                 print("\nError: Invalid pointers format!")
-                exit(1)
+                sys.exit(1)
 
         # Write ROM
         if new_script_size > original_text_size:
             print(f"\nERROR: script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
-            exit(1)
+            sys.exit(1)
         if new_pointers_size > original_pointers_size:
             print(f"\nERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)//2} lines in script.")
-            exit(1)         
+            sys.exit(1)         
         free_space_script = Encoder.write_rom(rom_file, original_text_start_offset, original_text_size, new_script_data, fill_free_space, fill_free_space_byte)
         print(f"\nScript text write to address {hex(original_text_start_offset)}, {free_space_script} bytes free.")
 
