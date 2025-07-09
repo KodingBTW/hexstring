@@ -1,10 +1,10 @@
 ::Build config
-::build_config.py
+build_config.py
 :: Get requirements
-::pip freeze > requirements.txt
+pip freeze > requirements.txt
 :: Compile
-::pyinstaller console.spec
-::pyinstaller hexstring.spec
+pyinstaller console.spec
+pyinstaller hexstring.spec
 :: Copying Files
 mkdir dist\resources
 copy resources\icon.ico dist\resources\
