@@ -11,8 +11,8 @@ class Analizer:
 
     def read_script(file):
         """
-        Reads a file containing the game's text and extracts pointer information from the first line. 
-        It also handles multiple breaker lines or just one.
+        Reads a file containing the game's text. 
+
         
         Parameters:
             file (str): The path to the file to read.

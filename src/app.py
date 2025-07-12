@@ -188,12 +188,12 @@ class Functions:
             self.main_window.insert_button.setDisabled(True)
 
     @staticmethod
-    def update_compression_types(index, type_combobox):
-        type_combobox.clear()
+    def update_compression_types(index, type_list):
+        type_list.clear()
         if index == 0:  # Lempel-Ziv
-            type_combobox.addItems(["LZ77", "LZSS", "LZW"])
+            type_list.addItems(["LZ77", "LZSS", "LZW"])
         elif index == 1:  # Golomb
-            type_combobox.addItems(["4 bits", "5 bits"])               
+            type_list.addItems(["4 bits", "5 bits"])               
         
     def process_extraction(self, out_file):
         # CONSTANTS OPTIONS
@@ -302,8 +302,8 @@ class Functions:
             pass
         else:
             try:
-                selected_method = self.main_window.compression_method_combobox.currentIndex()
-                type_index = self.main_window.compression_type_combobox.currentIndex()
+                selected_method = self.main_window.compression_method_list.currentIndex()
+                type_index = self.main_window.compression_type_list.currentIndex()
                 # Lempel-Ziv
                 if selected_method == 0:
                     # LZ77
@@ -471,8 +471,8 @@ class Functions:
             self.main_window.progress_bar.setValue(90)
         else:
             try:
-                selected_method = self.main_window.compression_method_combobox.currentIndex()
-                type_index = self.main_window.compression_type_combobox.currentIndex()
+                selected_method = self.main_window.compression_method_list.currentIndex()
+                type_index = self.main_window.compression_type_list.currentIndex()
                 # Lempel-Ziv
                 if selected_method == 0:
                     # LZ77
