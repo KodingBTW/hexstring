@@ -213,6 +213,7 @@ class Functions:
             if text_start_offset > text_end_offset:
                 self.show_error_dialog("Text start offset can't be higher than text end offset.")
                 print("Error: Extraction aborted!")
+                self.main_window.progress_bar.setValue(0)
                 return    
             text_size = text_end_offset - text_start_offset + 1
             base = int(self.main_window.pointers_base_input.text(), 16)
@@ -568,12 +569,12 @@ class Functions:
             return
             
         if not self.main_window.use_split_pointers_checkbox.isChecked():
-            free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data, fill_free_space, fill_free_space_byte)
+            free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data, False, fill_free_space_byte)
             print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//pointers_length} lines/pointers left.")
 
         else:
-            free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data_lsb, fill_free_space, fill_free_space_byte)
-            free_space_pointers = Encoder.write_rom(rom_file, original_pointers_end_offset, original_pointers_size, new_pointers_data_msb, fill_free_space, fill_free_space_byte)
+            free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data_lsb, False, fill_free_space_byte)
+            free_space_pointers = Encoder.write_rom(rom_file, original_pointers_end_offset, original_pointers_size, new_pointers_data_msb, False, fill_free_space_byte)
             print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//2} lines/pointers left.")
 
         self.main_window.progress_bar.setValue(100)

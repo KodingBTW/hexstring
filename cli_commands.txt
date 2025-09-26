@@ -18,6 +18,7 @@ General Commands:
 
 extract           				Extract script from ROM
 insert            				Insert script into ROM
+insertconfig <path> 			Insert script with .json config from GUI
 version							Show program version
 
 --rom <path>        				Path to the ROM file
@@ -57,7 +58,6 @@ If you want to add advanced options, always do it at the end.
 			
 --fill <hex_value>  						Fill value in hex (optional, Default: 0xFF)
 --use-split-pointers <lsb> <msb> <size>  	Three hexadecimal numbers for split pointers(optional)
---ignore-end-lines  						Ignore end lines (optional)
 --no-use-end-lines <hex_value> 				Do not use end lines (optional)
 
 NOTE: Some advanced options may cause general-purpose instructions to be omitted, for example, if --use-split-pointers is used. 
@@ -83,6 +83,6 @@ GAME: Star Fox 2 (USA).sfc
 CR32: 87653732 
 
 For extract:
-console.exe extract --rom <romName> --p 2b --pointers-offset 0x2EB3 --pointers-size 0x1ae --base -8000 --end-line 00 --out <outFile> --tbl <tblFile> --ignore-end-lines
+console.exe extract --rom <romName> --p 2b --pointers-offset 0x2EB3 --pointers-size 0x1ae --base -8000 --end-line 00 --out <outFile> --tbl <tblFile> --no-use-end-lines 2EB2
 For insert:
 console.exe insert --file <inputScript> --p 2b --text-offset 0x1168 --text-size 0x1d4b --pointers-offset 0x2EB3 --base -8000 --rom <romName> --tbl <tblFile> --no-use-end-lines 2EB2

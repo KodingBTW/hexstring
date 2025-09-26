@@ -74,6 +74,9 @@
   ('libcrypto-3.dll',
    'C:\\Users\\RODRIGO\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\libcrypto-3.dll',
    'BINARY'),
+  ('cli.py',
+   'C:\\Users\\RODRIGO\\Desktop\\ToolsRomHack\\HexString\\VERSION 1.4\\cli.py',
+   'DATA'),
   ('base_library.zip',
    'C:\\Users\\RODRIGO\\Desktop\\ToolsRomHack\\HexString\\VERSION '
    '1.4\\build\\console\\base_library.zip',

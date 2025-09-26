@@ -158,7 +158,6 @@ class Decoder:
             if value < 0:
                 value = 0
             result.append(value)
-        print(result)
         return result
 
     def decode_script(rom_data, addresses_list, end_line, char_table, bracket_index):

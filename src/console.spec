@@ -5,7 +5,7 @@ a = Analysis(
     ['console.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('cli.py', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -30,5 +30,5 @@ if __name__ == '__main__':
         cli.parse_arguments()
         cli.run()
     else:
-        exit(1)
+        sys.exit(1)
 
