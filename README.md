@@ -1,5 +1,5 @@
 # HexString
-HexString is a text dumper that lets you extract text from a ROM using a simple and friendly user interface, which you can then edit with your favorite text editor. It also allows for automatic pointer computation, making translation to ROM faster and easier. It supports compression of pointers of different lengths and formats, as well as compression using DTE/MTE.
+HexString is a text extractor that allows you to easily extract and insert text from a ROM, greatly facilitating translation (or text editing for romhacks). It has a simple and user-friendly interface, where you can edit the extracted text with your favorite text editor. In addition, it performs automatic pointer calculations to speed up reinsertion into the ROM. It supports pointers of different sizes (2, 3, and 4 bytes) and formats (little or big endian), as well as compression using DTE/MTE, and even pointers divided into parts.
 
 ## Requirements
 To compile you can use pyinstaller library. 
@@ -20,7 +20,8 @@ cd src
 build.bat
 ```
 ## Interface
-![image](https://github.com/user-attachments/assets/1d5d8b42-5a09-47c3-a6c0-98c0e47be763)
+<img width="476" height="905" alt="hexstring" src="https://github.com/user-attachments/assets/6d63ad6a-27e3-4a6b-8d2e-df3f32b5cd42" />
+
 
 To export script:
 1. Open ROM file and tbl file
@@ -42,35 +43,41 @@ More information in README.txt
 ## Console 
 HexString allows the use of console commands for script creation using the included "console.exe"
 ```
-console.exe [extract | insert] inFileName outFileName
+console.exe [extract | insert | extractconfig | insertconfig] commands
 ```
 
 Description:
 
 ```
+CLI Commands
+
 For extraction:
 
-console.exe extract --rom <romFile> --p <pointersFormat> --pointers-offset <pointersStartOffset> --pointers-size <tablePointersSize> --base <base> --end-line <end_lines> --out <outFile> --tbl <tblFile> [Advanced Options]
+console.exe extract --rom <romFile> --file <outputFile> --tbl <tblFile> --p <pointersFormat> --pointers-offset <pointersStartOffset> --pointers-size <tablePointersSize> --base <base> --end-line <end_lines> [Advanced Options]
 
 For insert:
 
-console.exe insert --file <inputFile> --p <pointersFormat> --text-offset <textStartOffset> --text-size <textSize> --pointers-offset <pointersStartOffset> --base <base> --rom <romName> --tbl <tblFile> [Advanced Options]
+console.exe insert --rom <romFile> --file <inputFile>  --tbl <tblFile> --p <pointersFormat> --text-offset <textStartOffset> --text-size <textSize> --pointers-offset <pointersStartOffset> --base <base> [Advanced Options]
+
+extractconfig <config path>
+
+insertconfig <config path>
 
 -h - Display help
 
--v - Output version information
+-v - Show build version
 ```
 List of pointer format supported:
 ```
 		2b 		2 bytes little endian
-		2bb 		2 bytes big endian
+		2bb 	2 bytes big endian
 		3b		3 bytes little endian
 		3bb		3 bytes big endian
 		4b		4 bytes little endian
 		4bb		4 bytes big endian
 ```
 See cli_commands.txt for detailed commands.
-Note: Command lines don't handle to much exception, try to avoid using correct commands.
+Note: Command lines don't handle to much exception, try to avoid incorrect entries.
 
 ## Frecuency Answer Questions
 
