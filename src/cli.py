@@ -160,7 +160,11 @@ class CLI:
             text_end = config.get("text_end_offset")
             argv.extend(['--no-use-end-lines', text_end])
         else:
-            argv += ["--end-line", str(config["end_line"])]
+            if config.get("end_line"):
+                argv += ["--end-line", str(config["end_line"])]
+            else:
+                print(f'\nERROR: Missing "end_line" value in "{config_file}" and option "not_use_end_line = False".')
+                sys.exit(1)
             
         # Save Parser
         parser = self.setup_parser()
@@ -424,7 +428,7 @@ class CLI:
             try:
                 end_line = Decoder.parse_end_lines(script_end_lines)
             except AttributeError:
-                print('\nERROR: No detected end lines in first line of script config and using "No_use_end_lines = False"')
+                print('\nERROR: Missing end line in script config and using "No_use_end_lines = False"')
                 sys.exit(1)
 
         # Check brackets
