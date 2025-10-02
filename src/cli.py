@@ -159,6 +159,8 @@ class CLI:
         if config.get("not_use_end_line") is True:
             text_end = config.get("text_end_offset")
             argv.extend(['--no-use-end-lines', text_end])
+        else:
+            argv += ["--end-line", str(config["end_line"])]
             
         # Save Parser
         parser = self.setup_parser()

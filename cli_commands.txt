@@ -69,7 +69,15 @@ It is possible to ignore --p <format>, in the same way, if no-use-end-lines, you
 and --pointers-size <hex_value>(Watch examples).
 
 ########################################################################################################################################################
-EXAMPLES
+Warning:
+########################################################################################################################################################
+
+The GUI always uses the absolute path, while the CLI uses the relative path. If you want to create scripts for quick extraction or insertion with the
+extractconfig/insertconfig commands, you may need to edit the path in .json config if you want to share it as a project.
+
+
+########################################################################################################################################################
+Examples:
 ########################################################################################################################################################
 NOTE: I WILL OMIT THE NAME OF THE ROM, TBL, INPUT AND OUTPUT FILE BECAUSE IT IS UNNECESSARY
 
