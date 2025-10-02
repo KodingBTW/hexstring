@@ -1,7 +1,9 @@
 {
-    "rom_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Exodus - Journey to the Promised Land (USA) (v4.0) (Unl).nes",
-    "tbl_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Exodus - Journey to the Promised Land (USA) (v4.0) (Unl).tbl",
-    "script_file": "C:/Users/RODRIGO/Desktop/ToolsRomHack/HexString/Exodus - Journey to the Promised Land (USA) (v4.0) (Unl)_script.bin",
+    "app_name": "HexString",
+    "version": "1.4.1",
+    "rom_file": "Exodus - Journey to the Promised Land (USA) (v4.0) (Unl).nes",
+    "tbl_file": "Exodus - Journey to the Promised Land (USA) (v4.0) (Unl).tbl",
+    "script_file": "Exodus - Journey to the Promised Land (USA) (v4.0) (Unl)_script.bin",
     "pointer_size": "2 bytes",
     "endianess": 0,
     "pointers_start_offset": "144F4",
@@ -12,10 +14,15 @@
     "end_line": "04,05,06,07",
     "fill_free_space_byte": "FF",
     "no_use_comments_lines": false,
-    "use_custom_brackets": false,
     "brackets": 0,
     "fill_free_space": false,
     "use_split_pointers": false,
-    "ignore_end_line": false,
-    "not_use_end_line": false
+    "not_use_end_line": false,
+    "use_compression_method": false,
+    "compression_algorithm": 0,
+    "compression_variant": 0,
+    "compare_to_dictionary": 0,
+    "search_combinations": false,
+    "max_frecuencies": "99",
+    "max_char_lenght": "2"
 }

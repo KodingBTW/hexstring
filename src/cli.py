@@ -2,9 +2,19 @@ import argparse
 import sys
 import os
 import json
-from config import app_name, version, author, license
+from config import app_name, version, author, license, date, hour
 from decoder import Decoder
 from encoder import Encoder
+
+class CustomArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(f"\n{message}\n")
+        CLI.show_help()
+        sys.exit(1)
+
+    def print_help(self):
+        CLI.show_help()
+        sys.exit(1)
 
 class CLI:
     def __init__(self):
@@ -18,48 +28,72 @@ class CLI:
             
     @staticmethod
     def auto_int(value):
-        """Auxiliar function for negative base numbers"""
-        try:
-            return int(value, 0)
-        except ValueError:
-            if value.startswith("-"):
-                return -int(value[1:], 16)
-            return int(value, 16)
+        # This auxiliar function handle the problem with negative hex and parsel entry with ", compatible with .json GUI config."""
+        value = value.strip('"')
+        if value.startswith('0x') or value.startswith('-0x'):
+            value = value.replace('0x', '')
+        
+        if value.startswith('-'):
+            return -int(value[1:], 16)
+        return int(value, 16)
+    
+    @staticmethod
+    def pointer_info(pointer):
+        if pointer == '2b':
+            return("Little Endian - 2 bytes")
+        elif pointer == '2bb':
+            return("Big Endian - 2 bytes")
+        elif pointer == '3b':
+            return("Little Endian - 3 bytes")
+        elif pointer == '3bb':
+            return("Big Endian - 3 bytes")
+        elif pointer == '4b':
+            return("Little Endian - 4 bytes")
+        elif pointer == '4bb':
+            return("Big Endian - 4 bytes")
+        else:
+            return("Undefined pointer.")
 
-    def show_help(self):
-        print("\n########################################")
-        print(f"########### {app_name} v{version} ###########")
-        print("########################################")
-        print(f"\nUsage: console.exe [-h] [-v] {{extract,insert}} [OPTIONS]\n")
-        print("  extract           Extract script from ROM")
-        print("  insert            Insert script into ROM")
-        print("  -h                Show this message.")
-        print("  -v                Show version")
-        print("\nOPTIONS:")
-        print("  --rom <path>                             Path to the ROM file.")
-        print("  --p <format>                             Pointers format.")
-        print("  --pointers-offset <hex_value>            Start offset of the pointer table.")
-        print("  --pointers-size <hex_value>              Size of the pointer table.")
-        print("  --base <base>                            Base address.")
-        print("  --end-line <end_line>                    End line (only for extract).")
-        print("  --out <path>                             Output file for extract.")
-        print("  --tbl <path>                             Path to the tbl file.")
-        print("  --text-offset <hex_value>                Text start offset (only for insert).")
-        print("  --text-size <hex_value>                  Text size (only for insert).")
-        print("  --no-comments                            Disables comments (optional).")
-        print("  --use-custom-brackets <0|1|2|3>          Choose a number for custom brackets (optional, Default: 0).")
-        print("  --fill <hex_value>                       Fill value in hex (optional, Default: 0xFF).")
-        print("  --use-split-pointers <lsb> <msb> <size>  Three hexadecimal numbers for split pointers (optional).")
-        print("  --no-use-end-lines  <hex_value>          Do not use end lines (optional).\n")
+    @staticmethod
+    def show_help():
+        print("+----------------------------------------------------------------------------------")
+        print(f"| {app_name} v{version} by {author}")
+        print("+----------------------------------------------------------------------------------")
+        print(f"| Usage:")
+        print("|   extract           Extract script from ROM")
+        print("|   insert            Insert script into ROM")
+        print("|   extractconfig     Extract script using .json config.")
+        print("|   insertconfig      Insert script using .json config.")
+        print("|   -v                Show build version.")
+        print("|   -help -?          Show this message.")
+        print("+----------------------------------------------------------------------------------")
+        print("| Options:")
+        print("|  --rom <path>                             Path to the ROM file.")
+        print("|  --file <path>                            Input/Output file.")
+        print("|  --tbl <path>                             Path to the tbl file.")
+        print("|  --p <format>                             Pointers format.")
+        print("|  --pointers-offset <hex_value>            Start offset of the pointers table.")
+        print("|  --pointers-size <hex_value>              Size of the pointers table.")
+        print("|  --base <base>                            Base address.")
+        print("|  --end-line <end_line>                    End line (Needed for extract).")
+        print("|  --text-offset <hex_value>                Text start offset (Needed for insert).")
+        print("|  --text-size <hex_value>                  Text size (Needed for insert).")
+        print("|  --use-custom-brackets <0|1|2|3>          Custom brackets for raw hex (optional).")
+        print("|  --no-comments                            Disables comments (optional).")
+        print("|  --fill <hex_value>                       Fill value in hex (optional).")
+        print("|  --use-split-pointers <lsb> <msb> <size>  Split pointers method (optional).")
+        print("|  --no-use-end-lines  <hex_value>          Do not use end lines (optional).")
+        print("+----------------------------------------------------------------------------------")
+        sys.exit(1)
 
-    def handle_get_config(self):
+    def handle_extract_config(self):
         config_file = self.args.config
         if not os.path.exists(config_file):
-            print(f"ERROR: Config file '{config_file}' not found.")
+            print(f"\nERROR: Config file '{config_file}' not found.")
             sys.exit(1)
 
         # Get the directory of the config file
-        config_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_file)))
+        config_dir = os.path.dirname(os.path.abspath(config_file))
 
         with open(config_file, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -67,99 +101,193 @@ class CLI:
         # Validate config
         json_version = config.get("version", "0.0.0")
         if tuple(map(int, json_version.split("."))) < (1, 4, 0):
-            print(f"ERROR: Config version {json_version} is lower than required 1.4.0")
+            print(f"\nERROR: Config version {json_version} is lower than required 1.4.0")
             sys.exit(1)
+            
+        # Validate required fields
+        required_fields = ["rom_file", "tbl_file", "script_file", "pointers_base", "text_start_offset", "text_end_offset"]
+        for field in required_fields:
+            if field not in config or not config[field]:
+                print(f"\nERROR: Missing or empty required field '{field}' in config.")
+                sys.exit(1)
 
         # Build parser
-        argv = ["insert"]
+        argv = ["extract"]
 
-        # Get config, using paths relative to config file's directory
-        if "rom_file" in config:
-            rom_path = os.path.join(config_dir, config["rom_file"])
-            argv += ["--rom", rom_path]
-        if "tbl_file" in config:
-            tbl_path = os.path.join(config_dir, config["tbl_file"])
-            argv += ["--tbl", tbl_path]
-        if "script_file" in config:
-            script_path = os.path.join(config_dir, config["script_file"])
-            argv += ["--file", script_path]
-        if "pointers_start_offset" in config:
-            argv += ["--pointers-offset", config["pointers_start_offset"]]
-        if "pointers_base" in config:
-            base_val = int(config["pointers_base"], 16)
-            argv += ["--base", str(base_val)]
-        if "text_start_offset" in config:
-            argv += ["--text-offset", config["text_start_offset"]]
-        if "text_end_offset" in config and "text_start_offset" in config:
-            size = int(config["text_end_offset"], 16) - int(config["text_start_offset"], 16) + 1
-            argv += ["--text-size", hex(size)]
+        # Get config, paths relative directory
+        rom_path = os.path.join(config_dir, config["rom_file"])
+        argv += ["--rom", rom_path]
+        tbl_path = os.path.join(config_dir, config["tbl_file"])
+        argv += ["--tbl", tbl_path]
+        script_path = os.path.join(config_dir, config["script_file"])
+        argv += ["--file", script_path]
+            
+        # Don't touch this
+        # Fix negative entry for .json and bypass negative entry with 0x by user.
+        base_str = config["pointers_base"]
+        if base_str.startswith("-"):
+            base_val = f'"-{base_str[1:]}"'
+        else:
+            base_val = base_str
+        argv += ["--base", base_val]
 
-        # Format Pointers
-        if "pointer_size" in config and "endianess" in config:
+        argv += ["--use-custom-brackets", str(config["brackets"])]
+            
+        # Get pointers
+        if config.get("use_split_pointers", False):
+            split_ptr_lsb_offset = config.get("split_ptr_lsb_offset")
+            split_ptr_msb_offset = config.get("split_ptr_msb_offset")
+            split_ptr_size = config.get("split_ptr_size")
+            argv += ["--use-split-pointers", f"{split_ptr_lsb_offset}", f"{split_ptr_msb_offset}", f"{split_ptr_size}"]
+        else:
             pointer_size = config["pointer_size"]
             endianess = config.get("endianess", 0)
-
             size_num = str(pointer_size).split()[0]
             if size_num in {"2", "3", "4"}:
                 value = f"{size_num}b"
                 if endianess == 1:
                     value += "b"
                 argv += ["--p", value]
+                argv += ["--pointers-offset", config["pointers_start_offset"]]
+                ptr_size = int(config["pointers_end_offset"], 16) - int(config["pointers_start_offset"], 16) + 1
+                argv += ["--pointers-size", hex(ptr_size)]
             else:
-                print(f"ERROR: Unsupported pointer_size '{pointer_size}'")
+                print(f"\nERROR: Unsupported pointer_size '{pointer_size}'")
+                sys.exit(1)
+            
+        # Get Advanced Options 
+        if config.get("not_use_end_line") is True:
+            text_end = config.get("text_end_offset")
+            argv.extend(['--no-use-end-lines', text_end])
+            
+        # Save Parser
+        parser = self.setup_parser()
+        self.args = parser.parse_args(argv)
+
+    def handle_insert_config(self):
+        config_file = self.args.config
+        if not os.path.exists(config_file):
+            print(f"\nERROR: Config file '{config_file}' not found.")
+            sys.exit(1)
+
+        # Get the directory of the config file
+        config_dir = os.path.dirname(os.path.abspath(config_file))
+
+        with open(config_file, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        # Validate config
+        json_version = config.get("version", "0.0.0")
+        if tuple(map(int, json_version.split("."))) < (1, 4, 0):
+            print(f"\nERROR: Config version {json_version} is lower than required 1.4.0")
+            sys.exit(1)
+            
+        # Validate required fields
+        required_fields = ["rom_file", "tbl_file", "script_file", "pointers_base", "text_start_offset", "text_end_offset"]
+        for field in required_fields:
+            if field not in config or not config[field]:
+                print(f"\nERROR: Missing or empty required field '{field}' in config.")
                 sys.exit(1)
 
-        # Get Advanced Options
-        if config.get("not_use_end_line", False):
-            end_offset = config.get("pointers_end_offset")
-            argv += ["--no-use-end-lines", end_offset]
+        # Build parser
+        argv = ["insert"]
 
-        if config.get("fill_free_space", False):
+        # Get config, paths relative directory
+        rom_path = os.path.join(config_dir, config["rom_file"])
+        argv += ["--rom", rom_path]
+        tbl_path = os.path.join(config_dir, config["tbl_file"])
+        argv += ["--tbl", tbl_path]
+        script_path = os.path.join(config_dir, config["script_file"])
+        argv += ["--file", script_path]
+
+        # Don't touch this
+        # Fix negative entry for .json and bypass negative entry with 0x by user.
+        base_str = config["pointers_base"]
+        if base_str.startswith("-"):
+            base_val = f'"-{base_str[1:]}"'
+        else:
+            base_val = base_str
+
+        argv += ["--base", base_val]
+        
+        argv += ["--text-offset", config["text_start_offset"]]
+        text_size = int(config["text_end_offset"], 16) - int(config["text_start_offset"], 16) + 1
+        argv += ["--text-size", hex(text_size)]
+        argv += ["--use-custom-brackets", str(config["brackets"])]
+
+        # Get pointers
+        if config.get("use_split_pointers", False):
+            split_ptr_lsb_offset = config.get("split_ptr_lsb_offset")
+            split_ptr_msb_offset = config.get("split_ptr_msb_offset")
+            split_ptr_size = config.get("split_ptr_size")
+            argv += ["--use-split-pointers", f"{split_ptr_lsb_offset}", f"{split_ptr_msb_offset}", f"{split_ptr_size}"]
+        else:
+            pointer_size = config["pointer_size"]
+            endianess = config.get("endianess", 0)
+            size_num = str(pointer_size).split()[0]
+            if size_num in {"2", "3", "4"}:
+                value = f"{size_num}b"
+                if endianess == 1:
+                    value += "b"
+                argv += ["--p", value]
+                argv += ["--pointers-offset", config["pointers_start_offset"]]
+            else:
+                print(f"\nERROR: Unsupported pointer_size '{pointer_size}'")
+                sys.exit(1)
+            
+        # Get Advanced Options 
+        if config.get("not_use_end_line") is True:
+            text_end = config.get("text_end_offset")
+            argv.extend(['--no-use-end-lines', text_end])
+        if config.get("fill_free_space") is True:
             fill_val = config.get("fill_free_space_byte")
-            argv += ["--fill", fill_val]
-
-        if config.get("no_use_comments_lines", False):
-            argv += ["--no-comments"]
-
-        if "brackets" in config:
-            argv += ["--use-custom-brackets", str(config["brackets"])]
+            argv.extend(["--fill", fill_val])
 
         # Save Parser
         parser = self.setup_parser()
         self.args = parser.parse_args(argv)
 
     def handle_extract(self):
-        print("\n########################################")
-        print(f"########### {app_name} v{version} ###########")
-        print("########################################")
-        print("\nExtracting using config:\n")
-        print(f"ROM File: {self.args.rom}")
-        print(f"Pointers Format: {self.args.p}")
-        print(f"Pointers Start Offset: {self.args.pointers_offset:x}")
-        print(f"Pointers Size: {self.args.pointers_size:x}")
-        print(f"Base Address: {self.args.base:x}")
-        print(f"End Line: {self.args.end_line:x}")
-        print(f"Output File: {self.args.out}")
-        print(f"Table File: {self.args.tbl}")
-        if self.args.use_custom_brackets is not None:
-            print(f"Brackets type: {self.args.use_custom_brackets}\n")
-
-        print("Advanced Options:\n")
-
-        if self.args.no_comments:
-            print("Comments are disabled.")
-         
+        print("+----------------------------------------------------------------------------------")
+        print(f"| {app_name} v{version} by {author}")
+        print("+----------------------------------------------------------------------------------")
+        print("| Summary:")
+        print(f"|   ROM File: {self.args.rom}")
+        print(f"|   Output File: {self.args.file}")
+        print(f"|   Table File: {self.args.tbl}")
+        if self.args.use_split_pointers is None:
+            print(f"|   Pointers Format: {CLI.pointer_info(self.args.p)}")
         if self.args.use_split_pointers is not None:
-            print(f"Using split pointers method, lsb offset: {self.args.use_split_pointers[0]:x}, msb offset: {self.args.use_split_pointers[1]:x}, size: {self.args.use_split_pointers[2]:x}")
-        
-        if self.args.no_use_end_lines:
-            print("Not using end lines.")
+            lsb_ptr_offset, msb_ptr_offset, split_ptr_size = self.args.use_split_pointers
+            print(f"|   Split Pointers LSB Offset: 0x{lsb_ptr_offset:X}")
+            print(f"|   Split Pointers MSB Offset: 0x{msb_ptr_offset:X}")
+            print(f"|   Split Pointers Size: {split_ptr_size} / 0x{split_ptr_size:X}")
+        else:
+            print(f"|   Pointers Start Offset: 0x{self.args.pointers_offset:X}")
+            print(f"|   Pointers Size: {self.args.pointers_size} / 0x{self.args.pointers_size:X}")
+        #print(f"|   Base: {self.args.base:X}")
+        base_display = f"-0x{abs(self.args.base):X}" if self.args.base < 0 else f"0x{self.args.base:X}"
+        print(f"|   Base: {base_display}")
+        if not self.args.no_use_end_lines:
+            print(f"|   End Line: {self.args.end_line.upper()}")
+        if self.args.use_custom_brackets is not None:
+            print(f"|   Bracket Type: {self.args.use_custom_brackets}")
+        print("+----------------------------------------------------------------------------------")
+        if self.args.no_comments or self.args.use_split_pointers is not None or self.args.no_use_end_lines:
+            print("| Advanced Options:")
+            if self.args.no_comments:
+                print("|   Comments disabled.")       
+            if self.args.use_split_pointers is not None:
+                print(f"|   Use split pointers method.")      
+            if self.args.no_use_end_lines:
+                print("|   Don't use end lines.")
+            print("+----------------------------------------------------------------------------------")
 
         # Get Options
 
         rom_file = self.args.rom
         tbl_file = self.args.tbl
-        out_file = self.args.out
+        out_file = self.args.file
         base = self.args.base
         no_comments_lines = self.args.no_comments
         
@@ -210,53 +338,62 @@ class CLI:
         else:
             end_line = Decoder.parse_end_lines(self.args.end_line)       
             script, total_bytes_read, lines_length = Decoder.decode_script(rom_data, format_pointers, end_line, char_table, bracket_index)
-            
+
         # Write Script
-        if self.args.use_split_pointers is not None and self.args.no_use_end_lines:
+        if self.args.use_split_pointers and self.args.no_use_end_lines:
             decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_length, None, no_comments_lines)
-            print(f"\nTEXT BLOCK SIZE: {total_bytes_read} / {hex(total_bytes_read)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size) * 2} bytes. Located {split_ptr_size} pointers.")
-        elif self.args.use_split_pointers is not None:
+            print(f"|   Script Size: {total_bytes_read} / 0x{total_bytes_read:X} bytes.")
+            print(f"|   Pointers Table Size: {split_ptr_size * 2} / 0x{split_ptr_size * 2:X} bytes. {split_ptr_size} pointers found.")
+        elif self.args.use_split_pointers:
             decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_length, end_line, no_comments_lines)
-            print(f"\nTEXT BLOCK SIZE: {total_bytes_read} / {hex(total_bytes_read)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size) * 2} bytes. Located {split_ptr_size} pointers.")
+            print(f"|   Script Size: {total_bytes_read} / 0x{total_bytes_read:X} bytes.")
+            print(f"|   Pointers Table Size: {split_ptr_size * 2} / 0x{split_ptr_size * 2:X} bytes. {split_ptr_size} pointers found.")
         elif self.args.no_use_end_lines:
             decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_length, None, no_comments_lines)
-            print(f"\nTEXT BLOCK SIZE: {total_bytes_read} / {hex(total_bytes_read)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_length} pointers.")
+            print(f"|   Script Size: {total_bytes_read} / 0x{total_bytes_read:X} bytes.")
+            print(f"|   Pointers Table Size: {pointers_size} / 0x{pointers_size:X} bytes. {pointers_size//pointers_length} pointers found.")
         else:
             decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_length, end_line, no_comments_lines)
-            print(f"\nTEXT BLOCK SIZE: {total_bytes_read} / {hex(total_bytes_read)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_length} pointers.")
-        print("Extraction Done!\n")
+            print(f"|   Script Size: {total_bytes_read} / 0x{total_bytes_read:X} bytes.")
+            print(f"|   Pointers Table Size: {pointers_size} / 0x{pointers_size:X} bytes. {pointers_size//pointers_length} pointers found.")
+        print("|   Extraction Done!")
+        print("+----------------------------------------------------------------------------------")
 
 
     def handle_insert(self):
-        print("\n########################################")
-        print(f"########### {app_name} v{version} ###########")
-        print("########################################")
-        print("\nInserting using config:\n")
-        print(f"Input File: {self.args.file}")
-        print(f"Pointers Format: {self.args.p}")
-        print(f"Text Start Offset: {self.args.text_offset:x}")
-        print(f"Text Size: {self.args.text_size:x}")
-        print(f"Pointers Start Offset: {self.args.pointers_offset:x}")
-        print(f"Base Address: {self.args.base:x}")
-        print(f"ROM File: {self.args.rom}")
-        print(f"Table File: {self.args.tbl}") 
-        if self.args.use_custom_brackets is not None:
-            print(f"Brackets type: {self.args.use_custom_brackets}\n")
-
-        print("Advanced Options:\n")
-        
-        if self.args.fill is not None:
-            print(f"Fill value: {self.args.fill:x}")
-        
+        print("+----------------------------------------------------------------------------------")
+        print(f"| {app_name} v{version} by {author}")
+        print("+----------------------------------------------------------------------------------")
+        print("| Summary:")
+        print(f"|   ROM File: {self.args.rom}")
+        print(f"|   Input File: {self.args.file}")
+        print(f"|   Table File: {self.args.tbl}") 
+        if self.args.use_split_pointers is None:
+            print(f"|   Pointers Format: {CLI.pointer_info(self.args.p)}")
         if self.args.use_split_pointers is not None:
-            print(f"Using split pointers method, lsb offset: {self.args.use_split_pointers[0]:x}, msb offset: {self.args.use_split_pointers[1]:x}, size: {self.args.use_split_pointers[2]:x}")
-        
-        if self.args.no_use_end_lines:
-            print("Not using end lines.")
+            lsb_ptr_offset, msb_ptr_offset, split_ptr_size = self.args.use_split_pointers
+            print(f"|   Split Pointers LSB Offset: 0x{lsb_ptr_offset:X}")
+            print(f"|   Split Pointers MSB Offset: 0x{msb_ptr_offset:X}")
+            print(f"|   Split Pointers Size: {split_ptr_size} / 0x{split_ptr_size:X}")
+        else:
+            print(f"|   Pointers Start Offset: 0x{self.args.pointers_offset:X}")    
+        print(f"|   Text Start Offset: 0x{self.args.text_offset:X}")
+        print(f"|   Text Size: {self.args.text_size} / 0x{self.args.text_size:X}")
+        #print(f"|   Base: {self.args.base:X}")
+        base_display = f"-0x{abs(self.args.base):X}" if self.args.base < 0 else f"0x{self.args.base:X}"
+        print(f"|   Base: {base_display}")
+        if self.args.use_custom_brackets is not None:
+            print(f"|   Bracket Type: {self.args.use_custom_brackets}")
+        print("+----------------------------------------------------------------------------------")
+        if self.args.fill is not None or self.args.use_split_pointers is not None or self.args.no_use_end_lines:
+            print("| Advanced Options:")
+            if self.args.fill is not None:
+                print(f"|   Fill Value: 0x{self.args.fill:X}")   
+            if self.args.use_split_pointers is not None:
+                print(f"|   Use split pointers method.") 
+            if self.args.no_use_end_lines:
+                print("|   Don't use end lines.")
+            print("+----------------------------------------------------------------------------------")
 
         # Get Options
 
@@ -330,38 +467,42 @@ class CLI:
 
         # Write ROM
         if new_script_size > original_text_size:
-            print(f"\nERROR: script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.\n")
+            print(f"\nERROR: Script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.\n")
             sys.exit(1)
         if new_pointers_size > original_pointers_size:
-            print(f"\nERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)//2} lines in script.\n")
+            print(f"\nERROR: Table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)//2} lines in script.\n")
             sys.exit(1)         
         free_space_script = Encoder.write_rom(rom_file, original_text_start_offset, original_text_size, new_script_data, fill_free_space, fill_free_space_byte)
-        print(f"\nScript text write to address {hex(original_text_start_offset)}, {free_space_script} bytes free.")
+        print(f"|   Script written at address 0x{original_text_start_offset:X}, {free_space_script} bytes of free space.")
 
-        if not self.args.use_split_pointers is not None:
+        if self.args.use_split_pointers is None:
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data, False, fill_free_space_byte)
-            print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//pointers_length} lines/pointers left.")
+            print(f"|   Pointers table written at address 0x{original_pointers_start_offset:X}, {free_space_pointers//pointers_length} lines/pointers left.")
 
         else:
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data_lsb, False, fill_free_space_byte)
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_end_offset, original_pointers_size, new_pointers_data_msb, False, fill_free_space_byte)
-            print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//2} lines/pointers left.")
-        print("Insertion Done!\n")
+            print(f"|   Pointers table written at address 0x{original_pointers_start_offset:X}, {free_space_pointers//2} lines/pointers left.")
+        print("|   Insertion Done!")
+        print("+----------------------------------------------------------------------------------")
+
 
     def setup_parser(self):
-        parser = argparse.ArgumentParser(
-            description="HexString: A tool for extracting and inserting scripts into ROM files."
+        parser = CustomArgumentParser(
+            description="HexString: A tool for extracting and inserting texts into ROM files."
         )
 
-        # General
-        parser.add_argument('-v', '--version', action='version', version=f"{app_name} v{version} by {author}")
+        # Version argument
+        parser.add_argument('-v', '--version', action='version', version=f"{app_name} by {author}, Build: {version}_{date}{hour}")
 
-        # Subcomands
+        # Subcommands
         subparsers = parser.add_subparsers(dest='command', help='subcommand help')
 
         # Extract
-        extract_parser = subparsers.add_parser('extract', help='Extract data from ROM')
-        extract_parser.add_argument('--rom', required=True, help='Path to the ROM file')
+        extract_parser = subparsers.add_parser('extract', help='Extract text from ROM')
+        extract_parser.add_argument('--rom', required=True, help='ROM file')
+        extract_parser.add_argument('--file', required=True, help='Output file')
+        extract_parser.add_argument('--tbl', required=True, help='Tbl file')     
         extract_parser.add_argument('--p', choices=['2b', '2bb', '3b', '3bb', '4b', '4bb'],
                                     help='Pointers format')
         extract_parser.add_argument('--pointers-offset', type=lambda x: int(x, 16),
@@ -370,9 +511,8 @@ class CLI:
                                     help='Size of the pointer table (hex value)')
         extract_parser.add_argument('--base', required=True, type=CLI.auto_int,
                                     help='Base address')
-        extract_parser.add_argument('--end-line', help='End line for the extract process')
-        extract_parser.add_argument('--out', required=True, help='Output file for the extracted data')
-        extract_parser.add_argument('--tbl', required=True, help='Path to the tbl file')
+        extract_parser.add_argument('--end-line', help='End line byte for split pointes')
+
 
         # Extract Advanced Options
         extract_parser.add_argument('--no-comments', action='store_true', help='Disables comments')
@@ -383,8 +523,11 @@ class CLI:
                                     help='Provide a hexadecimal value text_end_offset')
 
         # Insert
-        insert_parser = subparsers.add_parser('insert', help='Insert data into ROM')
-        insert_parser.add_argument('--file', required=True, help='Input file with the text data')
+        insert_parser = subparsers.add_parser('insert', help='Insert text into ROM')
+        insert_parser.add_argument('--rom', required=True, help='ROM file')
+        insert_parser.add_argument('--file', required=True, help='Input file')
+        insert_parser.add_argument('--tbl', required=True, help='Tbl file')
+        
         insert_parser.add_argument('--p', choices=['2b', '2bb', '3b', '3bb', '4b', '4bb'],
                                     help='Pointers format')
         insert_parser.add_argument('--text-offset', required=True, type=lambda x: int(x, 16),
@@ -395,8 +538,6 @@ class CLI:
                                     help='Start offset of the pointer table (hex value)')
         insert_parser.add_argument('--base', required=True, type=CLI.auto_int,
                                     help='Base address')
-        insert_parser.add_argument('--rom', required=True, help='Path to the ROM file')
-        insert_parser.add_argument('--tbl', required=True, help='Path to the tbl file')
 
         # Insert Advanced Options
         insert_parser.add_argument('--use-custom-brackets', choices=[0, 1, 2, 3], type=int, default=0, help='Choose custom bracket number. (Default: 0)')
@@ -404,7 +545,12 @@ class CLI:
         insert_parser.add_argument('--use-split-pointers', nargs=3, type=lambda x: int(x, 16), 
                                     help='Three hex values: lsb, msb, size for split pointers')
         insert_parser.add_argument('--no-use-end-lines', type=lambda x: int(x, 16), 
-                                    help='Provide a hexadecimal value text_end_offset')
+                                    help='Provide text end offset address')
+
+        # Extract Script Config
+        extractconfig_parser = subparsers.add_parser('extractconfig', help='Extract using JSON config file')
+        extractconfig_parser.add_argument('config', help='Path to config.json')
+        
         # Insert Script Config
         insertconfig_parser = subparsers.add_parser('insertconfig', help='Insert using JSON config file')
         insertconfig_parser.add_argument('config', help='Path to config.json')
@@ -420,8 +566,11 @@ class CLI:
             self.handle_extract()
         elif self.args.command == 'insert':
             self.handle_insert()
+        elif self.args.command == 'extractconfig':
+            self.handle_extract_config()
+            self.handle_extract()
         elif self.args.command == 'insertconfig':
-            self.handle_get_config()
+            self.handle_insert_config()
             self.handle_insert()
         else:
             self.show_help()

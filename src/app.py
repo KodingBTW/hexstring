@@ -30,9 +30,10 @@ from analizer import Analizer
 from cli import CLI
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QSizePolicy, QSpacerItem, QMenuBar, QMenu, QGridLayout, QVBoxLayout, QWidget, QMessageBox, QPlainTextEdit, QTabWidget, QLineEdit, QFileDialog, QLabel, QPushButton, QHBoxLayout, QGroupBox, QRadioButton, QComboBox, QCheckBox, QToolTip, QTextEdit, QDialog, QDialogButtonBox, QProgressBar
 from PyQt5.QtGui import QIcon, QRegExpValidator
-from PyQt5.QtCore import QRegExp, Qt
+from PyQt5.QtCore import QRegExp, Qt, QSettings
 from PyQt5 import QtCore, QtGui
 from ctypes import windll
+
 
 class Functions:
     def __init__(self, main_window):
@@ -241,8 +242,8 @@ class Functions:
             lsb = Decoder.read_rom(rom_file, lsb_ptr_offset, split_ptr_size)
             msb = Decoder.read_rom(rom_file, msb_ptr_offset, split_ptr_size)
             format_pointers = Decoder.process_pointers_split_2_bytes(lsb, msb, base)
-            for ptr in format_pointers:
-                print(f"Pointer: 0x{ptr:06X}")
+##            for ptr in format_pointers:
+##                print(f"Pointer: 0x{ptr:06X}")
         else:
             try:
                 pointers_start_offset = int(self.main_window.pointers_start_offset_input.text(), 16)
@@ -362,25 +363,26 @@ class Functions:
         
         # Write Script
         if use_compression_algorithm and rom_data_size != 0:
-            print(f"COMPRESSED SIZE: {original_data_size} / {hex(original_data_size)} bytes.")
-            print(f"DECOMPRESSED SIZE: {rom_data_size} / {hex(rom_data_size)} bytes.")
-            print(f"RATIO: {abs(original_data_size - rom_data_size) / rom_data_size}, FINAL OFFSET: {hex(rom_data_end_offset)}")
+            print(f"COMPRESSED SIZE: {original_data_size} / 0x{original_data_size:X} bytes.")
+            print(f"DECOMPRESSED SIZE: {rom_data_size} / 0x{rom_data_size:X} bytes.")
+            ratio = abs(original_data_size - rom_data_size) / rom_data_size
+            print(f"RATIO: {ratio}, FINAL OFFSET: 0x{rom_data_end_offset:X}")
         if use_split_pointers_method and no_use_end_lines_for_split:
             decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_length, None, no_comments_lines)
-            print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size * 2)} bytes. Located {split_ptr_size} pointers.")
+            print(f"TEXT BLOCK SIZE: {text_size} / 0x{text_size:X} bytes.")
+            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / 0x{split_ptr_size * 2:X} bytes. {split_ptr_size} pointers found.")
         elif use_split_pointers_method:
             decode_script = Decoder.write_out_file(out_file, script, lsb_ptr_offset, msb_ptr_offset + split_ptr_size - 1, split_ptr_size, format_pointers, lines_length, end_line, no_comments_lines)
-            print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / {hex(split_ptr_size * 2)} bytes. Located {split_ptr_size} pointers.")
+            print(f"TEXT BLOCK SIZE: {text_size} / 0x{text_size:X} bytes.")
+            print(f"PTR_TABLE BLOCK SIZE: {split_ptr_size * 2} / 0x{split_ptr_size * 2:X} bytes. {split_ptr_size} pointers found.")
         elif no_use_end_lines_for_split:
             decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_length, None, no_comments_lines)
-            print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_length} pointers.")
+            print(f"TEXT BLOCK SIZE: {text_size} / 0x{text_size:X} bytes.")
+            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / 0x{pointers_size:X} bytes. {pointers_size // pointers_length} pointers found.")
         else:
             decode_script = Decoder.write_out_file(out_file, script, pointers_start_offset, pointers_start_offset + pointers_size - 1, pointers_size, format_pointers, lines_length, end_line, no_comments_lines)
-            print(f"TEXT BLOCK SIZE: {text_size} / {hex(text_size)} bytes.")
-            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / {hex(pointers_size)} bytes. Located {pointers_size//pointers_length} pointers.")
+            print(f"TEXT BLOCK SIZE: {text_size} / 0x{text_size:X} bytes.")
+            print(f"PTR_TABLE BLOCK SIZE: {pointers_size} / 0x{pointers_size:X} bytes. {pointers_size // pointers_length} pointers found.")
         self.main_window.progress_bar.setValue(100)
         self.show_success_dialog("Script extracted successfully!")
         print("Script extracted successfully!")
@@ -545,23 +547,23 @@ class Functions:
         # Write ROM
         if new_script_size > original_text_size:
             self.main_window.progress_bar.setValue(100)
-            self.show_error_dialog(f"ERROR: script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
-            print(f"ERROR: script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
+            self.show_error_dialog(f"ERROR: Script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
+            print(f"ERROR: Script size has exceeded its maximum size. Remove {new_script_size - original_text_size} bytes.")
             self.main_window.progress_bar.setValue(0)
             return
         if new_pointers_size > original_pointers_size:
             self.main_window.progress_bar.setValue(100)
-            self.show_error_dialog(f"ERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)} lines in script.")
-            print(f"ERROR: table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)} lines in script.")
+            self.show_error_dialog(f"ERROR: Table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)} lines in script.")
+            print(f"ERROR: Table pointer size has exceeded its maximum size. Remove {(new_pointers_size - original_pointers_size)} lines in script.")
             self.main_window.progress_bar.setValue(0)
             return
         if use_compression_algorithm and decompressed_script_size != 0:
-            print(f"COMPRESSED SIZE: {compressed_new_script_size} / {hex(compressed_new_script_size)} bytes.")
-            print(f"DECOMPRESSED SIZE: {decompressed_script_size} / {hex(decompressed_script_size)} bytes.")
+            print(f"COMPRESSED SIZE: {compressed_new_script_size} / 0x{compressed_new_script_size:X} bytes.")
+            print(f"DECOMPRESSED SIZE: {decompressed_script_size} / 0x{decompressed_script_size:X} bytes.")
             print(f"RATIO: {abs(compressed_new_script_size - decompressed_script_size) / decompressed_script_size}")
         try:
             free_space_script = Encoder.write_rom(rom_file, original_text_start_offset, original_text_size, new_script_data, fill_free_space, fill_free_space_byte)
-            print(f"Script text write to address {hex(original_text_start_offset)}, {free_space_script} bytes free.")
+            print(f"Script written at address 0x{original_text_start_offset:X}, {free_space_script} bytes of free space.")
         except Exception as e:
             self.show_error_dialog(f"{e}")
             print("Error: Insertion aborted!")
@@ -570,12 +572,12 @@ class Functions:
             
         if not self.main_window.use_split_pointers_checkbox.isChecked():
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data, False, fill_free_space_byte)
-            print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//pointers_length} lines/pointers left.")
+            print(f"Pointers table written at address 0x{original_pointers_start_offset:X}, {free_space_pointers // pointers_length} lines/pointers left.")
 
         else:
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_start_offset, original_pointers_size, new_pointers_data_lsb, False, fill_free_space_byte)
             free_space_pointers = Encoder.write_rom(rom_file, original_pointers_end_offset, original_pointers_size, new_pointers_data_msb, False, fill_free_space_byte)
-            print(f"Pointer table write to address {hex(original_pointers_start_offset)}, {free_space_pointers//2} lines/pointers left.")
+            print(f"Pointers table written at address 0x{original_pointers_start_offset:X}, {free_space_pointers // 2} lines/pointers left.")
 
         self.main_window.progress_bar.setValue(100)
         self.show_success_dialog("Script inserted successfully!")
@@ -640,14 +642,24 @@ class FileHandler:
     def __init__(self, main_window):
         self.main_window = main_window
         self.functions = Functions(main_window)
+        self.settings = QSettings(f"{author}", f"{app_name}")
+        self.last_config_path = self.settings.value("Path", "", type=str)
+        #self.last_version = self.settings.value("Version", f"{version}", type=str)
+        self.settings.setValue("Version", f"{version}")
+        self.has_loaded_config = False
 
     def open_config(self):
         options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self.main_window, "Open config file", "", "Config files (*.json);;All Files (*)", options=options)
+        start_dir = self.last_config_path or ""
+        file_name, _ = QFileDialog.getOpenFileName(self.main_window, "Open config file", start_dir, "Config files (*.json);;All Files (*)", options=options)
 
         if file_name:
             try:
                 with open(file_name, 'r') as file:
+                    self.last_config_path = file_name
+                    self.has_loaded_config = True
+                    self.settings.setValue("Path", file_name)
+
                     config_data = json.load(file)
 
                     # Files Config
@@ -713,14 +725,24 @@ class FileHandler:
         options = QFileDialog.Options()
         script_file = self.main_window.selected_script_file_name.text()
         rom_file = self.main_window.selected_rom_file_name.text()
-        if script_file:
-            file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", os.path.splitext(script_file)[0] + "_config", "Config files (*.json);;All Files (*)", options=options)
+
+        if self.has_loaded_config and self.last_config_path:
+            suggested_name = self.last_config_path
+        elif script_file:
+            suggested_name = os.path.splitext(script_file)[0] + "_config"
         elif rom_file:
-            file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", os.path.splitext(rom_file)[0] + "_config", "Config files (*.json);;All Files (*)", options=options)
+            suggested_name = os.path.splitext(rom_file)[0] + "_config"
         else:
-            file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", "config", "Config files (*.json);;All Files (*)", options=options)
+            suggested_name = "config"
+
+        file_name, _ = QFileDialog.getSaveFileName(self.main_window, "Save config file", suggested_name, "Config files (*.json);;All Files (*)", options=options)
+            
         if file_name:
             try:
+                self.last_config_path = file_name
+                self.has_loaded_config = True
+                self.settings.setValue("Path", file_name)
+                
                 config_data = {}
                 
                 # Program Data
@@ -822,6 +844,7 @@ class FileHandler:
                 # Save
                 with open(file_name, 'w') as file:
                     json.dump(config_data, file, indent=4)
+                saved_config = True
                 print("Config exported successfully!")
             except Exception as e:
                 self.functions.show_error_dialog(f"Error exporting config {e}")
@@ -1399,13 +1422,13 @@ class MyWindow(QMainWindow):
         advanced_layout.addWidget(use_custom_brackets_widget)
 
         # Not comment lines 
-        self.not_comment_lines_checkbox = QCheckBox("Not duplicate line as a comment.", self)
+        self.not_comment_lines_checkbox = QCheckBox("Don't comment lines.", self)
         self.not_comment_lines_checkbox.setToolTip("Use this if you don't want a duplicate line as a comment.\n"'Note: comments will start with ";".') 
         advanced_layout.addWidget(self.not_comment_lines_checkbox)
 
         # Fill free space with byte
 
-        self.fill_free_space_byte_checkbox = QCheckBox("Fill free space when inserting with byte:", self)
+        self.fill_free_space_byte_checkbox = QCheckBox("Fill free space:", self)
         self.fill_free_space_byte_checkbox.setToolTip("Use this if you want to fill the free space left when you insert the script with a custom byte.\nOnly when inserted.")
         self.fill_free_space_byte_checkbox.stateChanged.connect(self.functions.toggle_fill_free_space)
         self.fill_free_space_byte_input = QLineEdit(self)
@@ -1431,7 +1454,7 @@ class MyWindow(QMainWindow):
         
         
         # Use split pointers extraction (2 bytes only)
-        self.use_split_pointers_checkbox = QCheckBox("Use split pointers method (2 bytes only).", self)
+        self.use_split_pointers_checkbox = QCheckBox("Use split pointers method.", self)
         self.use_split_pointers_checkbox.setToolTip("Use it if the pointer table is divided into 2 parts.\nLSB: Lest significant bytes.\nMSB: Most significant bytes.\nSize: Numbers of pointers <hex>.")
         self.use_split_pointers_checkbox.stateChanged.connect(self.functions.toggle_split_pointers)
         advanced_layout.addWidget(self.use_split_pointers_checkbox)

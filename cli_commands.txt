@@ -6,23 +6,26 @@ General Synopsis:
 
 For extraction:
 
-console.exe extract --rom <romFile> --p <pointersFormat> --pointers-offset <pointersStartOffset> --pointers-size <tablePointersSize> --base <base> --end-line <end_lines> --out <outFile> --tbl <tblFile> [Advanced Options]
+console.exe extract --rom <romFile> --file <outputFile> --tbl <tblFile> --p <pointersFormat> --pointers-offset <pointersStartOffset> --pointers-size <tablePointersSize> --base <base> --end-line <end_lines> [Advanced Options]
 
 For insert:
 
-console.exe insert --file <inputFile> --p <pointersFormat> --text-offset <textStartOffset> --text-size <textSize> --pointers-offset <pointersStartOffset> --base <base> --rom <romName> --tbl <tblFile> [Advanced Options]
+console.exe insert --rom <romFile> --file <inputFile>  --tbl <tblFile> --p <pointersFormat> --text-offset <textStartOffset> --text-size <textSize> --pointers-offset <pointersStartOffset> --base <base> [Advanced Options]
 
 ##############################################################################################################################################################
 General Commands:
 ##############################################################################################################################################################
 
-extract           				Extract script from ROM
-insert            				Insert script into ROM
-insertconfig <path> 			Insert script with .json config from GUI
-version							Show program version
+extract           					;Extract script from ROM
+insert            					;Insert script into ROM
+extractconfig <path> 				;Extract script with .json config from GUI
+insertconfig <path> 				;Insert script with .json config from GUI
+-v									;Show build version.
 
---rom <path>        				Path to the ROM file
---p <format>        				Pointers format <2b|2bb|3b|3bb|4b|4bb>
+--rom <path>                    	;Path to the ROM file.")
+--out <path>              			;Input/Output file")
+--tbl <path>                    	;Path to the tbl file.")
+--p <format>        				;Pointers format <2b|2bb|3b|3bb|4b|4bb>
 
 		2b 		2 bytes little endian
 		2bb 	2 bytes big endian
@@ -31,18 +34,19 @@ version							Show program version
 		4b		4 bytes little endian
 		4bb		4 bytes big endian
 
-for extraction only:
---pointers-offset <hex_value>  		Start offset of the pointer table
---pointers-size <hex_value>    		Size of the pointer table
---base <base>       				Base address
---end-line <end_line>   			End line (only for extract)(Not use prefix "0x")
---out <path>        				Output file for extract
---tbl <path>        				Path to the tbl file
+--base <base> 						;Base address.
+      
+for extraction:
 
-for insertion only:
+--pointers-offset <hex_value>  		;Start offset of the pointer table
+--pointers-size <hex_value>    		;Size of the pointer table
+--end-line <end_line>   			;End line, can be multiple separate with "," (only for extract)(Not use prefix "0x")
 
---text-offset <hex_value>    		Text start offset (only for insert)
---text-size <hex_value>      		Text size (only for insert)
+for insertion:
+
+--pointers-offset <hex_value>  		;Start offset of the pointer table
+--text-offset <hex_value>    		;Text start offset (only for insert)
+--text-size <hex_value>      		;Text size (only for insert)
 
 ##############################################################################################################################################################
 Advanced Options:
@@ -58,7 +62,7 @@ If you want to add advanced options, always do it at the end.
 			
 --fill <hex_value>  						Fill value in hex (optional, Default: 0xFF)
 --use-split-pointers <lsb> <msb> <size>  	Three hexadecimal numbers for split pointers(optional)
---no-use-end-lines <hex_value> 				Do not use end lines (optional)
+--no-use-end-lines <text-end-offset> 		Do not use end lines. (Need text end offset) (optional)
 
 NOTE: Some advanced options may cause general-purpose instructions to be omitted, for example, if --use-split-pointers is used. 
 It is possible to ignore --p <format>, in the same way, if no-use-end-lines, you can ignore --pointers-offset
@@ -69,20 +73,22 @@ EXAMPLES
 ########################################################################################################################################################
 NOTE: I WILL OMIT THE NAME OF THE ROM, TBL, INPUT AND OUTPUT FILE BECAUSE IT IS UNNECESSARY
 
-GAME: Chip 'n Dale Rescue Rangers (USA).nes  
-CR32: 8BF29CB6
-
-For extract:
-console.exe extract --rom <romName> --base 0x10 --end-line FF --out <outFile> --tbl <tblFile> --use-split-pointers 9546 955A 14
-For insert:
-console.exe insert --file <inputScript> --text-offset <textStartOffset> --text-size <textSize> --base 0x10 --rom <romName> --tbl <tblFile> --use-split-pointers 9546 955A 14
-
-
 
 GAME: Star Fox 2 (USA).sfc
 CR32: 87653732 
 
 For extract:
-console.exe extract --rom <romName> --p 2b --pointers-offset 0x2EB3 --pointers-size 0x1ae --base -8000 --end-line 00 --out <outFile> --tbl <tblFile> --no-use-end-lines 2EB2
+console.exe extract --rom <romName> --file <outputFile> --tbl <tblFile> --p 2b --pointers-offset 0x2EB3 --pointers-size 0x1ae --base -8000 --end-line 00 --no-use-end-lines 2EB2
+
 For insert:
-console.exe insert --file <inputScript> --p 2b --text-offset 0x1168 --text-size 0x1d4b --pointers-offset 0x2EB3 --base -8000 --rom <romName> --tbl <tblFile> --no-use-end-lines 2EB2
+console.exe insert --rom <romName> --file <outputFile> --tbl <tblFile> --p 2b --text-offset 0x1168 --text-size 0x1d4b --pointers-offset 0x2EB3 --base -8000 --no-use-end-lines 2EB2
+
+
+GAME: Chip 'n Dale Rescue Rangers (USA).nes  
+CR32: 8BF29CB6
+
+For extract:
+console.exe extract --rom <romName> --base 0x10 --end-line FF --file <outputFile> --tbl <tblFile> --use-split-pointers 9546 955A 14
+
+For insert:
+console.exe insert --file <inputFile> --text-offset <textStartOffset> --text-size <textSize> --base 0x10 --rom <romName> --tbl <tblFile> --use-split-pointers 9546 955A 14
